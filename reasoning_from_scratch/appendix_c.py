@@ -1,7 +1,7 @@
 
 # Copyright (c) Sebastian Raschka under Apache License 2.0 (see LICENSE.txt)
-# Source for "Build a Reasoning Model (From Scratch)": https://mng.bz/lZ5B
-# Code repository: https://github.com/rasbt/reasoning-from-scratch
+# 《从零构建推理模型》配套源码：https://mng.bz/lZ5B
+# 代码仓库：https://github.com/rasbt/reasoning-from-scratch
 
 import os
 import json
@@ -11,10 +11,10 @@ import torch
 QWEN3_CONFIG_1_7B = {
     "vocab_size": 151_936,
     "context_length": 40_960,
-    "emb_dim": 2048,                 # 2x larger than 0.6B model
+    "emb_dim": 2048,                 # 比 0.6B 模型大 2 倍
     "n_heads": 16,
     "n_layers": 28,
-    "hidden_dim": 6144,              # 2x larger than 0.6B model
+    "hidden_dim": 6144,              # 比 0.6B 模型大 2 倍
     "head_dim": 128,
     "qk_norm": True,
     "n_kv_groups": 8,
@@ -22,14 +22,14 @@ QWEN3_CONFIG_1_7B = {
     "dtype": torch.bfloat16,
 }
 
-# 4 billion parameters
+# 40 亿参数
 QWEN3_CONFIG_4B = {
     "vocab_size": 151_936,
     "context_length": 40_960,
-    "emb_dim": 2560,                 # 25% larger than above
-    "n_heads": 32,                   # 2x larger than above
-    "n_layers": 36,                  # 29% larger than above
-    "hidden_dim": 9728,              # ~3x larger than above
+    "emb_dim": 2560,                 # 比上面的模型大 25%
+    "n_heads": 32,                   # 比上面的模型大 2 倍
+    "n_layers": 36,                  # 比上面的模型大 29%
+    "hidden_dim": 9728,              # 约为上面模型的 3 倍
     "head_dim": 128,
     "qk_norm": True,
     "n_kv_groups": 8,
@@ -37,13 +37,13 @@ QWEN3_CONFIG_4B = {
     "dtype": torch.bfloat16,
 }
 
-# 8 billion parameters
+# 80 亿参数
 QWEN3_CONFIG_8B = {
     "vocab_size": 151_936,
     "context_length": 40_960,
-    "emb_dim": 4096,                 # 60% larger than above
+    "emb_dim": 4096,                 # 比上面的模型大 60%
     "n_heads": 32,
-    "n_layers": 36,                  # 26% larger than above
+    "n_layers": 36,                  # 比上面的模型大 26%
     "hidden_dim": 12288,
     "head_dim": 128,
     "qk_norm": True,
@@ -52,14 +52,14 @@ QWEN3_CONFIG_8B = {
     "dtype": torch.bfloat16,
 }
 
-# 14 billion parameters
+# 140 亿参数
 QWEN3_CONFIG_14B = {
         "vocab_size": 151_936,
         "context_length": 40_960,
-        "emb_dim": 5120,                 # 25% larger than above
-        "n_heads": 40,                   # 25% larger than above
-        "n_layers": 40,                  # 11% larger than above
-        "hidden_dim": 17408,             # 42% larger than above
+        "emb_dim": 5120,                 # 比上面的模型大 25%
+        "n_heads": 40,                   # 比上面的模型大 25%
+        "n_layers": 40,                  # 比上面的模型大 11%
+        "hidden_dim": 17408,             # 比上面的模型大 42%
         "head_dim": 128,
         "qk_norm": True,
         "n_kv_groups": 8,
@@ -71,9 +71,9 @@ QWEN3_CONFIG_32B = {
         "vocab_size": 151_936,
         "context_length": 40_960,
         "emb_dim": 5120,
-        "n_heads": 64,                   # 60% larger than above
-        "n_layers": 64,                  # 60% larger than above
-        "hidden_dim": 25600,             # 47% larger than above
+        "n_heads": 64,                   # 比上面的模型大 60%
+        "n_layers": 64,                  # 比上面的模型大 60%
+        "hidden_dim": 25600,             # 比上面的模型大 47%
         "head_dim": 128,
         "qk_norm": True,
         "n_kv_groups": 8,
@@ -85,7 +85,7 @@ QWEN3_CONFIG_32B = {
 def load_weights_into_qwen(model, param_config, params):
     def assign(left, right, tensor_name="unknown"):
         if left.shape != right.shape:
-            raise ValueError(f"Shape mismatch in tensor '{tensor_name}'. Left: {left.shape}, Right: {right.shape}")
+            raise ValueError(f"张量 '{tensor_name}' 的形状不匹配。左侧：{left.shape}，右侧：{right.shape}")
         return torch.nn.Parameter(right.clone().detach() if isinstance(right, torch.Tensor) else torch.tensor(right))
 
     model.tok_emb.weight = assign(model.tok_emb.weight, params["model.embed_tokens.weight"], "model.embed_tokens.weight")
@@ -94,7 +94,7 @@ def load_weights_into_qwen(model, param_config, params):
         block = model.trf_blocks[ln]
         att = block.att
 
-        # Q, K, V projections
+        # Q、K、V 投影
         att.W_query.weight = assign(
             att.W_query.weight,
             params[f"model.layers.{ln}.self_attn.q_proj.weight"],
@@ -111,14 +111,14 @@ def load_weights_into_qwen(model, param_config, params):
             f"model.layers.{ln}.self_attn.v_proj.weight"
         )
 
-        # Output projection
+        # 输出投影
         att.out_proj.weight = assign(
             att.out_proj.weight,
             params[f"model.layers.{ln}.self_attn.o_proj.weight"],
             f"model.layers.{ln}.self_attn.o_proj.weight"
         )
 
-        # QK norms
+        # QK 归一化层
         if hasattr(att, "q_norm") and att.q_norm is not None:
             att.q_norm.scale = assign(
                 att.q_norm.scale,
@@ -132,14 +132,14 @@ def load_weights_into_qwen(model, param_config, params):
                 f"model.layers.{ln}.self_attn.k_norm.weight"
             )
 
-        # Attention layernorm
+        # 注意力层归一化
         block.norm1.scale = assign(
             block.norm1.scale,
             params[f"model.layers.{ln}.input_layernorm.weight"],
             f"model.layers.{ln}.input_layernorm.weight"
         )
 
-        # Feedforward weights
+        # 前馈网络权重
         block.ff.fc1.weight = assign(
             block.ff.fc1.weight,
             params[f"model.layers.{ln}.mlp.gate_proj.weight"],
@@ -161,16 +161,16 @@ def load_weights_into_qwen(model, param_config, params):
             f"model.layers.{ln}.post_attention_layernorm.weight"
         )
 
-    # Final normalization and output head
+    # 最终归一化层和输出头
     model.final_norm.scale = assign(model.final_norm.scale, params["model.norm.weight"], "model.norm.weight")
 
-    # Model uses weight tying, hence we reuse the embedding layer weights here
+    # 模型采用权重绑定，因此这里复用嵌入层的权重
     model.out_head.weight = assign(model.out_head.weight, params["model.embed_tokens.weight"], "model.embed_tokens.weight")
 
 
 def download_from_huggingface_from_snapshots(repo_id, local_dir):
     from huggingface_hub import hf_hub_download, snapshot_download
-    from safetensors.torch import load_file  # or your preferred loader
+    from safetensors.torch import load_file  # 也可以使用你偏好的加载器
 
     repo_dir = snapshot_download(repo_id=repo_id, local_dir=local_dir)
 
@@ -178,7 +178,7 @@ def download_from_huggingface_from_snapshots(repo_id, local_dir):
     single_file_path = os.path.join(repo_dir, "model.safetensors")
 
     if os.path.exists(index_path):
-        # Multi-shard model
+        # 多分片模型
         with open(index_path, "r") as f:
             index = json.load(f)
 
@@ -188,7 +188,7 @@ def download_from_huggingface_from_snapshots(repo_id, local_dir):
             shard = load_file(shard_path)
             weights_dict.update(shard)
     elif os.path.exists(single_file_path):
-        # Single-shard model
+        # 单分片模型
         weights_file = hf_hub_download(
             repo_id=repo_id,
             filename="model.safetensors",
@@ -196,6 +196,6 @@ def download_from_huggingface_from_snapshots(repo_id, local_dir):
         )
         weights_dict = load_file(weights_file)
     else:
-        raise FileNotFoundError("No model.safetensors or model.safetensors.index.json found.")
+        raise FileNotFoundError("未找到 model.safetensors 或 model.safetensors.index.json。")
 
     return weights_dict

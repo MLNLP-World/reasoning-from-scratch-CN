@@ -1,9 +1,9 @@
 
 # Copyright (c) Sebastian Raschka under Apache License 2.0 (see LICENSE.txt)
-# Source for "Build a Reasoning Model (From Scratch)": https://mng.bz/lZ5B
-# Code repository: https://github.com/rasbt/reasoning-from-scratch
+# 《从零构建推理模型》配套源码：https://mng.bz/lZ5B
+# 代码仓库：https://github.com/rasbt/reasoning-from-scratch
 
-from reasoning_from_scratch.ch02_ex import generate_text_basic_stream_cache
+from reasoning_from_scratch.ch02 import generate_text_basic_stream_cache
 
 
 def predict_choice(
@@ -22,29 +22,29 @@ def predict_choice(
             if letter in "ABCD":
                 pred = letter
                 break
-        if pred:  # stop as soon as a letter appears
+        if pred:  # 一旦出现字母就停止
             break
     return pred
 
 
 def elo_ratings(vote_pairs, k_factor=32, initial_rating=1000):
-    # Initialize all models with the same base rating
+    # 用相同的初始等级分初始化所有模型
     ratings = {
         model: initial_rating
         for pair in vote_pairs
         for model in pair
     }
 
-    # Update ratings after each match
+    # 每场对局后更新等级分
     for winner, loser in vote_pairs:
         rating_winner, rating_loser = ratings[winner], ratings[loser]
 
-        # Expected score for the current winner given the ratings
+        # 根据等级分计算当前胜者的预期得分
         expected_winner = 1.0 / (
             1.0 + 10 ** ((rating_loser - rating_winner) / 400.0)
         )
 
-        # k_factor determines sensitivity of rating updates
+        # k_factor 决定等级分更新的敏感程度
         ratings[winner] = (
             rating_winner + k_factor * (1 - expected_winner)
         )

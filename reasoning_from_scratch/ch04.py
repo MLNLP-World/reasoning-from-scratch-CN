@@ -1,8 +1,8 @@
 # Copyright (c) Sebastian Raschka under Apache License 2.0 (see LICENSE.txt)
-# Source for "Build a Reasoning Model (From Scratch)": https://mng.bz/lZ5B
-# Code repository: https://github.com/rasbt/reasoning-from-scratch
+# 《从零构建推理模型》配套源码：https://mng.bz/lZ5B
+# 代码仓库：https://github.com/rasbt/reasoning-from-scratch
 
-from .ch02_ex import generate_text_basic_stream_cache
+from .ch02 import generate_text_basic_stream_cache
 from .ch03 import extract_final_candidate
 from .qwen3 import KVCache
 
@@ -13,11 +13,11 @@ import torch
 def generate_text_stream_concat_flex(
     model, tokenizer, prompt, device, max_new_tokens,
     verbose=False,
-    generate_func=None,  # New
-    **generate_kwargs  # New
+    generate_func=None,  # 新增
+    **generate_kwargs  # 新增
 ):
 
-    if generate_func is None:  # New
+    if generate_func is None:  # 新增
         generate_func = generate_text_basic_stream_cache
 
     input_ids = torch.tensor(
@@ -25,12 +25,12 @@ def generate_text_stream_concat_flex(
         ).unsqueeze(0)
 
     generated_ids = []
-    for token in generate_func(  # New
+    for token in generate_func(  # 新增
         model=model,
         token_ids=input_ids,
         max_new_tokens=max_new_tokens,
         eos_token_id=tokenizer.eos_token_id,
-        **generate_kwargs,  # New
+        **generate_kwargs,  # 新增
     ):
         next_token_id = token.squeeze(0)
         generated_ids.append(next_token_id.item())
@@ -46,23 +46,23 @@ def generate_text_stream_concat_flex(
 
 def plot_scores_bar(
     next_token_logits, start=19_800, end=19_900,
-    arrow=True, ylabel="Logit value"
+    arrow=True, ylabel="Logit 值"
 ):
 
     import matplotlib.pyplot as plt
 
-    # Select vocabulary subsection
+    # 选取词表子区间
     x = torch.arange(start, end)
 
-    # .cpu() is a shortcut for to(torch.device("cpu"))
+    # .cpu() 是 to(torch.device("cpu")) 的简写
     logits_section = next_token_logits[0, start:end].float().cpu()
 
-    # Plot logits
+    # 绘制 logits
     plt.bar(x, logits_section)
-    plt.xlabel("Vocabulary index")
+    plt.xlabel("词表索引")
     plt.ylabel(ylabel)
 
-    # Highlight max logit
+    # 突出显示最大的 logit
     if arrow:
         max_idx = torch.argmax(logits_section)
         plt.annotate(
@@ -82,7 +82,7 @@ def plot_scores_bar(
 
 def scale_logits_by_temperature(logits, temperature):
     if temperature <= 0:
-        raise ValueError("Temperature must be positive")
+        raise ValueError("温度必须为正数")
     return logits / temperature
 
 
@@ -96,22 +96,22 @@ def plot_logits_with_temperature(
     x = torch.arange(start, end)
     logits_orig = next_token_logits[0, start:end].float().cpu()
 
-    # Apply temperature scaling
+    # 应用温度缩放
     logits_scaled = [
         scale_logits_by_temperature(logits_orig, T) for T in temps
     ]
-    # Plot logits
-    plt.plot(x, logits_orig, label="Original logits", lw=2)
+    # 绘制 logits
+    plt.plot(x, logits_orig, label="原始 logits", lw=2)
     plt.plot(
         x, logits_scaled[0],
-        label=f"T={temps[0]} (sharper)", ls="--", lw=1
+        label=f"T={temps[0]}（更尖锐）", ls="--", lw=1
     )
     plt.plot(
         x, logits_scaled[1],
-        label=f"T={temps[1]} (flatter)", ls=":", lw=3
+        label=f"T={temps[1]}（更平坦）", ls=":", lw=3
     )
 
-    # Highlight max logit
+    # 突出显示最大的 logit
     max_idx = torch.argmax(logits_orig)
     plt.annotate(
         "Berlin",
@@ -121,8 +121,8 @@ def plot_logits_with_temperature(
         fontsize=12,
     )
 
-    plt.xlabel("Vocabulary index")
-    plt.ylabel("Logit value")
+    plt.xlabel("词表索引")
+    plt.ylabel("Logit 值")
     plt.legend()
     plt.grid(alpha=0.3)
     plt.tight_layout()
@@ -130,19 +130,19 @@ def plot_logits_with_temperature(
 
 
 def count_samples(probas, num_samples=1000, threshold=1, tokenizer=None):
-    # Draw samples according to probabilities
+    # 根据概率进行采样
     samples = torch.multinomial(
         probas.cpu(), num_samples=num_samples, replacement=True
     )
 
-    # Count how often each index was selected
+    # 统计每个索引被选中的次数
     counts = torch.bincount(samples.squeeze(0), minlength=1)
 
-    # Print results
+    # 打印结果
     for i, c in enumerate(counts):
         if c > threshold:
             if tokenizer is None:
-                print(f"Vocab index {i}: {c.item()}x")
+                print(f"词表索引 {i}：{c.item()} 次")
             else:
                 print(f"'{tokenizer.decode([i])}': {c.item()}x")
 
@@ -159,31 +159,31 @@ def generate_text_temp_stream_cache(
     cache = KVCache(n_layers=model.cfg["n_layers"])
     model.reset_kv_cache()
 
-    # Step 3.1: Get logits
+    # 步骤 3.1：获取 logits
     out = model(token_ids, cache=cache)[:, -1]
     for _ in range(max_new_tokens):
 
         ########################################
-        # NEW:
+        # 新增：
         orig_device = token_ids.device
 
-        if temperature is None or temperature == 1.0:
+        if temperature is None or temperature == 0.0:
             next_token = torch.argmax(out, dim=-1, keepdim=True)
 
         else:
-            # Step 3.2: Apply temperature scaling on logits
+            # 步骤 3.2：对 logits 应用温度缩放
             logits = scale_logits_by_temperature(out, temperature)
 
-            # Step 3.3: Convert to probabilities
+            # 步骤 3.3：转换为概率
             probas = torch.softmax(logits, dim=-1)
 
-            # Step 3.4: Sample token according to probabilities
+            # 步骤 3.4：根据概率采样词元
             next_token = torch.multinomial(probas.cpu(), num_samples=1)
             next_token = next_token.to(orig_device)
 
         #########################################
         if (eos_token_id is not None
-                and next_token.item() == eos_token_id):
+                and torch.all(next_token == eos_token_id)):
             break
 
         yield next_token
@@ -194,28 +194,30 @@ def top_p_filter(probas, top_p):
     if top_p is None or top_p >= 1.0:
         return probas
 
-    # Step 4.1: Sort by descending probability
+    # 步骤 4.1：按概率降序排序
     sorted_probas, sorted_idx = torch.sort(probas, dim=1, descending=True)
 
-    # Step 4.2: Cumulative sum
+    # 步骤 4.2：计算累积和
     cumprobas = torch.cumsum(sorted_probas, dim=1)
 
-    # Step 4.3.1: Keep tokens where cumprob <= top_p
-    keep = cumprobas <= top_p
-    # For top_p <= 0, only the highest‑probability token is guaranteed to be kept as a fallback
+    # 步骤 4.3.1：保留词元之前的前缀累积概率小于 top_ps 的词元
+    # 示例：[0.5, 0.41, 0.09] 在 top_p=0.9 时应保留前两个词元
+    prefix = cumprobas - sorted_probas   # 每个词元之前的累积概率
+    keep = prefix < top_p
+    # 始终至少保留一个词元（当 top_p 很小或非正时的回退策略）
     keep[:, 0] = True
 
-    # Step 4.3.2: Zero out beyond cutoff
+    # 步骤 4.3.2：将截断点之后的值置零
     kept_sorted = torch.where(
         keep, sorted_probas,
         torch.zeros_like(sorted_probas)
     )
-    # Step 4.3.3: Map back to original order
+    # 步骤 4.3.3：映射回原始顺序
     filtered = torch.zeros_like(probas).scatter(1, sorted_idx, kept_sorted)
 
-    # Step 4.4: Renormalize to sum to 1 (optional)
-    denom = torch.sum(filtered, dim=1).clamp_min(1e-12).unsqueeze(-1)
-# The .unsqueeze(-1) is for optional batch support
+    # 步骤 4.4：重新归一化，使总和为 1
+    denom = torch.sum(filtered, dim=1, keepdim=True).clamp_min(1e-12)
+    # 严格来说不必设置 keepdim=True，但这样代码也能用于批处理场景
     return filtered / denom
 
 
@@ -232,31 +234,31 @@ def generate_text_top_p_stream_cache(
     cache = KVCache(n_layers=model.cfg["n_layers"])
     model.reset_kv_cache()
 
-    # Step 3.1: Get logits
+    # 步骤 3.1：获取 logits
     out = model(token_ids, cache=cache)[:, -1]
     for _ in range(max_new_tokens):
 
         orig_device = token_ids.device
 
-        if temperature is None or temperature == 1.0:
+        if temperature is None or temperature == 0.0:
             next_token = torch.argmax(out, dim=-1, keepdim=True)
 
         else:
-            # Step 3.2: Apply temperature scaling on logits
+            # 步骤 3.2：对 logits 应用温度缩放
             logits = scale_logits_by_temperature(out, temperature)
 
-            # Step 3.3: Convert to probabilities
+            # 步骤 3.3：转换为概率
             probas = torch.softmax(logits, dim=-1)
 
-            # (New) Step 4: Apply top-p filter to probabilities
+            # （新增）步骤 4：对概率应用 top-p 过滤
             probas = top_p_filter(probas, top_p)
 
-            # Step 3.4: Sample token according to probabilities
+            # 步骤 3.4：根据概率采样词元
             next_token = torch.multinomial(probas.cpu(), num_samples=1)
             next_token = next_token.to(orig_device)
 
         if (eos_token_id is not None
-                and next_token.item() == eos_token_id):
+                and torch.all(next_token == eos_token_id)):
             break
 
         yield next_token
@@ -270,7 +272,7 @@ def self_consistency_vote(
 ):
     full_answers, short_answers = [], []
 
-    # 1) Sample multiple answers
+    # 1）采样多个答案
     for i in range(num_samples):
         if seed is not None:
             torch.manual_seed(seed + i + 1)
@@ -282,16 +284,16 @@ def self_consistency_vote(
             temperature=temperature, top_p=top_p,
         )
 
-        # 2) Extract the final (short) answer from each answer
+        # 2）从每个答案中提取最终的简短答案
         short = extract_final_candidate(
             answer, fallback="number_then_full"
         )
         full_answers.append(answer)
         short_answers.append(short)
         if show_progress:
-            print(f"[Sample {i+1}/{num_samples}] → {short!r}")
+            print(f"[样本 {i+1}/{num_samples}] → {short!r}")
 
-    # 3) Choose the most frequent final answer (self-consistency vote)
+    # 3）选择出现次数最多的最终答案（自洽性投票）
     counts = Counter(short_answers)
     groups = {s: [] for s in counts}
     for idx, s in enumerate(short_answers):

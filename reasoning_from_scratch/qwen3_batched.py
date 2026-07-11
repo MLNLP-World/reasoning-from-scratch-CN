@@ -1,6 +1,6 @@
 # Copyright (c) Sebastian Raschka under Apache License 2.0 (see LICENSE.txt)
-# Source for "Build a Reasoning Model (From Scratch)": https://mng.bz/lZ5B
-# Code repository: https://github.com/rasbt/reasoning-from-scratch
+# 《从零构建推理模型》配套源码：https://mng.bz/lZ5B
+# 代码仓库：https://github.com/rasbt/reasoning-from-scratch
 
 from .qwen3 import KVCache, download_qwen3_small, Qwen3Tokenizer
 
@@ -9,36 +9,53 @@ from pathlib import Path
 import torch
 import torch.nn as nn
 
-# 0.6 billion parameters
+# 6 亿参数
 QWEN_CONFIG_06_B = {
-    "vocab_size": 151_936,     # Vocabulary size
-    "context_length": 40_960,  # Length originally used during training
-    "emb_dim": 1024,           # Embedding dimension
-    "n_heads": 16,             # Number of attention heads
-    "n_layers": 28,            # Number of layers
-    "hidden_dim": 3072,        # Size of intermediate dim in FeedForward
-    "head_dim": 128,           # Size of the heads in GQA
-    "qk_norm": True,           # Whether to normalize queries & keys in GQA
-    "n_kv_groups": 8,          # Key-Value groups for GQA
-    "rope_base": 1_000_000.0,  # The base in RoPE's "theta"
-    "dtype": torch.bfloat16,   # Lower-precision dtype to reduce memory
+    "vocab_size": 151_936,     # 词表大小
+    "context_length": 40_960,  # 原始训练所用的序列长度
+    "emb_dim": 1024,           # 嵌入维度
+    "n_heads": 16,             # 注意力头数量
+    "n_layers": 28,            # 层数
+    "hidden_dim": 3072,        # 前馈网络中间维度的大小
+    "head_dim": 128,           # GQA 中每个头的维度
+    "qk_norm": True,           # 是否对 GQA 中的查询和键进行归一化
+    "n_kv_groups": 8,          # GQA 的键值组数量
+    "rope_base": 1_000_000.0,  # RoPE 中 theta 的基数
+    "dtype": torch.bfloat16,   # 使用较低精度的数据类型以减少内存占用
 }
 
 
 class Qwen3Model(nn.Module):
-    def __init__(self, cfg):
+    """支持填充掩码的 Qwen3 批处理实现。
+
+    参数：
+        cfg：模型配置字典。
+        float32_upcast：默认让注意力分数和 softmax 计算路径保持
+            float32。批处理实现同时使用因果掩码和左填充掩码；对于
+            很长或包含大量填充的批次，其数值稳定性比单序列路径更
+            脆弱。因此，在批量生成和评估中使用 float32 是更安全的
+            默认选择。简而言之，float32_upcast 可使结果与无填充的
+            单样本版本等价，但速度更慢且内存占用更多。如果更看重
+            较低的内存占用和更快的训练速度，可以通过
+            `Qwen3Model(..., float32_upcast=False)` 将其关闭。
+    """
+
+    def __init__(self, cfg, float32_upcast=True):
         super().__init__()
 
-        # Main model parameters
+        # 主要模型参数
         self.tok_emb = nn.Embedding(cfg["vocab_size"], cfg["emb_dim"], dtype=cfg["dtype"])
 
-        self.trf_blocks = nn.ModuleList(  # ModuleList since Sequential can only accept one input, and we need `x, mask, cos, sin`
-            [TransformerBlock(cfg) for _ in range(cfg["n_layers"])]
+        self.trf_blocks = nn.ModuleList(  # 使用 ModuleList，因为 Sequential 只能接收一个输入，而这里需要 `x, mask, cos, sin`
+            [
+                TransformerBlock(cfg, float32_upcast=float32_upcast)
+                for _ in range(cfg["n_layers"])
+            ]
         )
         self.final_norm = RMSNorm(cfg["emb_dim"])
         self.out_head = nn.Linear(cfg["emb_dim"], cfg["vocab_size"], bias=False, dtype=cfg["dtype"])
 
-        # Reusable utilities
+        # 可复用的辅助组件
         if cfg["head_dim"] is None:
             head_dim = cfg["emb_dim"] // cfg["n_heads"]
         else:
@@ -57,16 +74,16 @@ class Qwen3Model(nn.Module):
         x = tok_embeds
         B, num_tokens = x.shape[0], x.shape[1]
 
-        # Derive pos_start from cache content (layer 0 K length) if present
+        # 如果存在缓存，则根据其内容（第 0 层 K 的长度）推导 pos_start
         if cache is not None and cache.get(0) is not None:
-            prev_k0, _ = cache.get(0)                 # (B, G_kv, L_prev, D)
+            prev_k0, _ = cache.get(0)                 # 形状：(B, G_kv, L_prev, D)
             pos_start = prev_k0.size(2)               # L_prev
         else:
             pos_start = 0
 
         pos_end = pos_start + num_tokens
 
-        # Build causal mask for [Q=num_tokens, K=pos_end]
+        # 为 [Q=num_tokens, K=pos_end] 构建因果掩码
         base = torch.triu(
             torch.ones(pos_end, pos_end, device=x.device, dtype=torch.bool), diagonal=1
         )
@@ -74,7 +91,7 @@ class Qwen3Model(nn.Module):
 
         has_pad = attn_mask is not None and (~attn_mask[:, :pos_end]).any().item()
         if has_pad:
-            # Mask out padded keys so they don't appear in the softmax denominator
+            # 屏蔽填充键，使其不出现在 softmax 的分母中
             kpm = (attn_mask[:, :pos_end] == 0).view(B, 1, 1, pos_end)
             mask = causal4d | kpm
         else:
@@ -82,7 +99,7 @@ class Qwen3Model(nn.Module):
 
         pos_ids_current = torch.arange(pos_start, pos_end, device=x.device).unsqueeze(0).expand(B, -1)
 
-        # zero-out padded query rows so their Q/K/V become zeros and don't affect cache
+        # 将填充查询行置零，使其 Q/K/V 均为零且不影响缓存
         if attn_mask is not None:
             qmask = attn_mask[:, pos_start:pos_end].unsqueeze(-1)
             x = x * qmask.to(x.dtype)
@@ -99,13 +116,13 @@ class Qwen3Model(nn.Module):
         logits = self.out_head(x.to(self.cfg["dtype"]))
         return logits
 
-    # Keep for compatibility with regular, non-batched generate_text_basic_cache function
+    # 保留此项以兼容常规的非批处理 generate_text_basic_cache 函数
     def reset_kv_cache(self):
         pass
 
 
 class TransformerBlock(nn.Module):
-    def __init__(self, cfg):
+    def __init__(self, cfg, float32_upcast=True):
         super().__init__()
         self.att = GroupedQueryAttention(
             d_in=cfg["emb_dim"],
@@ -113,24 +130,25 @@ class TransformerBlock(nn.Module):
             head_dim=cfg["head_dim"],
             num_kv_groups=cfg["n_kv_groups"],
             qk_norm=cfg["qk_norm"],
-            dtype=cfg["dtype"]
+            dtype=cfg["dtype"],
+            float32_upcast=float32_upcast,
         )
         self.ff = FeedForward(cfg)
         self.norm1 = RMSNorm(cfg["emb_dim"], eps=1e-6)
         self.norm2 = RMSNorm(cfg["emb_dim"], eps=1e-6)
 
     def forward(self, x, mask, cos, sin, cache=None, pos_ids=None):
-        # Shortcut connection for attention block
+        # 注意力块的残差连接
         shortcut = x
         x = self.norm1(x)
-        x, next_cache = self.att(x, mask, cos, sin, cache=cache, pos_ids=pos_ids)  # Shape [batch_size, num_tokens, emb_size]
-        x = x + shortcut  # Add the original input back
+        x, next_cache = self.att(x, mask, cos, sin, cache=cache, pos_ids=pos_ids)  # 形状为 [batch_size, num_tokens, emb_size]
+        x = x + shortcut  # 加回原始输入
 
-        # Shortcut connection for feed-forward block
+        # 前馈网络块的残差连接
         shortcut = x
         x = self.norm2(x)
         x = self.ff(x)
-        x = x + shortcut  # Add the original input back
+        x = x + shortcut  # 加回原始输入
 
         return x, next_cache
 
@@ -151,17 +169,24 @@ class FeedForward(nn.Module):
 
 class GroupedQueryAttention(nn.Module):
     def __init__(
-        self, d_in, num_heads, num_kv_groups, head_dim=None, qk_norm=False, dtype=None
+        self,
+        d_in,
+        num_heads,
+        num_kv_groups,
+        head_dim=None,
+        qk_norm=False,
+        dtype=None,
+        float32_upcast=True,
     ):
         super().__init__()
-        assert num_heads % num_kv_groups == 0, "num_heads must be divisible by num_kv_groups"
+        assert num_heads % num_kv_groups == 0, "num_heads 必须能被 num_kv_groups 整除"
 
         self.num_heads = num_heads
         self.num_kv_groups = num_kv_groups
         self.group_size = num_heads // num_kv_groups
 
         if head_dim is None:
-            assert d_in % num_heads == 0, "`d_in` must be divisible by `num_heads` if `head_dim` is not set"
+            assert d_in % num_heads == 0, "未设置 `head_dim` 时，`d_in` 必须能被 `num_heads` 整除"
             head_dim = d_in // num_heads
 
         self.head_dim = head_dim
@@ -178,27 +203,28 @@ class GroupedQueryAttention(nn.Module):
             self.k_norm = RMSNorm(head_dim, eps=1e-6)
         else:
             self.q_norm = self.k_norm = None
+        self.float32_upcast = float32_upcast
 
     def forward(self, x, mask, cos, sin, cache=None, pos_ids=None):
         b, num_tokens, _ = x.shape
 
-        # Apply projections
-        queries = self.W_query(x)  # (b, num_tokens, num_heads * head_dim)
-        keys = self.W_key(x)       # (b, num_tokens, num_kv_groups * head_dim)
-        values = self.W_value(x)   # (b, num_tokens, num_kv_groups * head_dim)
+        # 应用投影
+        queries = self.W_query(x)  # 形状：(b, num_tokens, num_heads * head_dim)
+        keys = self.W_key(x)       # 形状：(b, num_tokens, num_kv_groups * head_dim)
+        values = self.W_value(x)   # 形状：(b, num_tokens, num_kv_groups * head_dim)
 
-        # Reshape
+        # 重塑形状
         queries = queries.view(b, num_tokens, self.num_heads, self.head_dim).transpose(1, 2)
         keys_new = keys.view(b, num_tokens, self.num_kv_groups, self.head_dim).transpose(1, 2)
         values_new = values.view(b, num_tokens, self.num_kv_groups, self.head_dim).transpose(1, 2)
 
-        # Optional normalization
+        # 可选的归一化
         if self.q_norm:
             queries = self.q_norm(queries)
         if self.k_norm:
             keys_new = self.k_norm(keys_new)
 
-        # Apply RoPE (per-token position ids)
+        # 应用 RoPE（使用逐词元位置 ID）
         queries = apply_rope_with_pos_ids(queries, cos, sin, pos_ids)
         keys_new = apply_rope_with_pos_ids(keys_new, cos, sin, pos_ids)
         if cache is not None:
@@ -209,17 +235,21 @@ class GroupedQueryAttention(nn.Module):
             keys, values = keys_new, values_new
         next_cache = (keys, values)
 
-        # Expand K and V to match number of heads
+        # 扩展 K 和 V 以匹配注意力头数量
         keys = keys.repeat_interleave(self.group_size, dim=1)
         values = values.repeat_interleave(self.group_size, dim=1)
 
-        attn_scores = torch.matmul(queries.to(torch.float32), keys.transpose(2, 3).to(torch.float32))
+        score_dtype = torch.float32 if self.float32_upcast else queries.dtype
+        attn_scores = torch.matmul(
+            queries.to(score_dtype),
+            keys.transpose(2, 3).to(score_dtype),
+        )
         attn_scores = attn_scores / self.head_dim**0.5
 
-        # Apply mask with -inf so masked entries are exactly zero after softmax
+        # 用 -inf 应用掩码，使被屏蔽项在 softmax 后严格为零
         attn_scores = attn_scores.masked_fill(mask, -torch.inf)
 
-        # Stable log-sum-exp over the unmasked set
+        # 在未屏蔽集合上稳定地计算 log-sum-exp
         row_max = attn_scores.amax(dim=-1, keepdim=True)
         row_max = torch.where(torch.isfinite(row_max), row_max, torch.zeros_like(row_max))
         exp_scores = torch.exp(attn_scores - row_max)
@@ -228,31 +258,31 @@ class GroupedQueryAttention(nn.Module):
         denom = exp_scores.sum(dim=-1, keepdim=True)
         attn_weights = exp_scores / denom.clamp(min=torch.finfo(exp_scores.dtype).tiny)
 
-        # Back to model dtype
+        # 当分数路径提升精度后，使上下文矩阵乘法的数据类型与 value 一致
         attn_weights = attn_weights.to(values.dtype)
 
-        # As before
+        # 与之前相同
         context = torch.matmul(attn_weights, values)
         context = context.transpose(1, 2).reshape(b, num_tokens, self.d_out)
         return self.out_proj(context), next_cache
 
 
 def compute_rope_params(head_dim, theta_base=10_000, context_length=4096, dtype=torch.float32):
-    assert head_dim % 2 == 0, "Embedding dimension must be even"
+    assert head_dim % 2 == 0, "嵌入维度必须为偶数"
 
-    # Compute the inverse frequencies
+    # 计算逆频率
     inv_freq = 1.0 / (theta_base ** (torch.arange(0, head_dim, 2, dtype=dtype)[: (head_dim // 2)].float() / head_dim))
 
-    # Generate position indices
+    # 生成位置索引
     positions = torch.arange(context_length, dtype=dtype)
 
-    # Compute the angles
-    angles = positions[:, None] * inv_freq[None, :]  # Shape: (context_length, head_dim // 2)
+    # 计算角度
+    angles = positions[:, None] * inv_freq[None, :]  # 形状：(context_length, head_dim // 2)
 
-    # Expand angles to match the head_dim
-    angles = torch.cat([angles, angles], dim=1)  # Shape: (context_length, head_dim)
+    # 扩展角度以匹配 head_dim
+    angles = torch.cat([angles, angles], dim=1)  # 形状：(context_length, head_dim)
 
-    # Precompute sine and cosine
+    # 预先计算正弦和余弦
     cos = torch.cos(angles)
     sin = torch.sin(angles)
 
@@ -315,46 +345,49 @@ def generate_text_basic_batched_cache(
     if attn_mask is not None:
         attn_mask = attn_mask.to(torch.bool).to(device)
 
-    # Init cache and model position
+    # 初始化缓存和模型位置
     cache = KVCache(n_layers=model.cfg["n_layers"])
 
-    # Prefill
+    # 预填充
     out = model(token_ids, cache=cache, attn_mask=attn_mask)[:, -1]
 
-    # Track which sequences have already produced EOS
+    # 记录哪些序列已经生成 EOS
     if eos_token_id is not None:
-        # If a prompt already ends with EOS, consider it finished
+        # 如果提示词已经以 EOS 结尾，则视为已完成
         finished = (token_ids[:, -1] == eos_token_id)
     else:
         finished = None
 
-    # Decode
+    # 解码
     cur_attn = attn_mask
+    generated_tokens = []
     for _ in range(max_new_tokens):
-        # If all sequences are already finished, stop
+        # 如果所有序列都已完成，则停止
         if eos_token_id is not None and finished is not None and torch.all(finished):
             break
 
         next_token = torch.argmax(out, dim=-1, keepdim=True)
 
         if eos_token_id is not None:
-            # Force already finished rows to keep emitting EOS to maintain shape
+            # 强制已完成的行继续生成 EOS，以维持张量形状
             eos_tok = next_token.new_full((batch_size, 1), eos_token_id)
             next_token = torch.where(finished.view(batch_size, 1), eos_tok, next_token)
 
-        # Extend mask to include the newly generated token
+        # 扩展掩码以包含新生成的词元
         if cur_attn is not None:
             ones = torch.ones((batch_size, 1), dtype=cur_attn.dtype, device=device)
             cur_attn = torch.cat([cur_attn, ones], dim=1)
 
-        # Advance one token with KV cache
+        # 使用 KV 缓存向前生成一个词元
         out = model(next_token, cache=cache, attn_mask=cur_attn)[:, -1]
-        token_ids = torch.cat([token_ids, next_token], dim=1)
+        generated_tokens.append(next_token)
 
-        # Update finished mask after appending this step's token
+        # 追加本步骤词元后更新完成状态掩码
         if eos_token_id is not None:
             finished = finished | (next_token.squeeze(1) == eos_token_id)
 
+    if generated_tokens:
+        return torch.cat(generated_tokens, dim=1)
     return token_ids[:, input_length:]
 
 
@@ -377,13 +410,13 @@ def generate_text_basic_batched_stream_cache(
     if attn_mask is not None:
         attn_mask = attn_mask.to(torch.bool).to(device)
 
-    # Init cache and model position
+    # 初始化缓存和模型位置
     cache = KVCache(n_layers=model.cfg["n_layers"])
 
-    # Prefill
+    # 预填充
     out = model(token_ids, cache=cache, attn_mask=attn_mask)[:, -1]
 
-    # Decode
+    # 解码
     cur_attn = attn_mask
     for _ in range(max_new_tokens):
         next_token = torch.argmax(out, dim=-1, keepdim=True)
@@ -393,12 +426,12 @@ def generate_text_basic_batched_stream_cache(
 
         yield next_token
 
-        # Extend mask to include the newly generated token
+        # 扩展掩码以包含新生成的词元
         if cur_attn is not None:
             ones = torch.ones((B, 1), dtype=cur_attn.dtype, device=device)
             cur_attn = torch.cat([cur_attn, ones], dim=1)
 
-        # Advance one token with KV cache
+        # 使用 KV 缓存向前生成一个词元
         out = model(next_token, cache=cache, attn_mask=cur_attn)[:, -1]
         token_ids = torch.cat([token_ids, next_token], dim=1)
 
@@ -411,7 +444,7 @@ def shrink_kv_cache_inplace(cache, keep_mask, n_layers):
         if kv is None:
             continue
         K, V = kv
-        K = K[keep_mask]  # shrink along batch dim
+        K = K[keep_mask]  # 沿批次维度缩减
         V = V[keep_mask]
         cache.update(i, (K, V))
 
@@ -425,44 +458,42 @@ def generate_text_basic_batched_cache_stop(
     attn_mask=None,
     pad_id=None,
 ):
-    """
-    Same as generate_text_basic_batched_cache but
-    with per-sequence early stop.
-    I.e., finished rows that see an EOS written don't
-    participate in forward pass anymore.
+    """与 generate_text_basic_batched_cache 相同，但支持各序列独立提前停止。
+
+    也就是说，已经写入 EOS 的已完成行不再参与前向传播。
     """
     device = token_ids.device
     model.eval()
 
     B, T0 = token_ids.shape
 
-    # Build attention mask
+    # 构建注意力掩码
     if attn_mask is None and pad_id is not None:
         attn_mask = (token_ids != pad_id)
     if attn_mask is not None:
         attn_mask = attn_mask.to(torch.bool).to(device)
 
-    # Init cache and prefill once on full batch
+    # 初始化缓存，并对完整批次执行一次预填充
     cache = KVCache(n_layers=model.cfg["n_layers"])
     out = model(token_ids, cache=cache, attn_mask=attn_mask)[:, -1]  # (B, V)
 
     finished_full = torch.zeros(B, dtype=torch.bool, device=device)
-    active_idx = torch.arange(B, device=device)  # active rows -> original rows
-    cur_attn_active = attn_mask                  # mirrors the active cache
-    generated_full_steps = []                    # list of (B,1) step tensors
+    active_idx = torch.arange(B, device=device)  # 活动行 -> 原始行
+    cur_attn_active = attn_mask                  # 与活动缓存对应
+    generated_full_steps = []                    # 由 (B, 1) 单步张量组成的列表
 
     for _ in range(max_new_tokens):
-        # Next tokens for the active sub-batch
-        next_token_active = torch.argmax(out, dim=-1, keepdim=True)  # (B_active, 1)
+        # 活动子批次的下一个词元
+        next_token_active = torch.argmax(out, dim=-1, keepdim=True)  # 形状：(B_active, 1)
 
-        # Scatter into a full-sized (B,1) step tensor (EOS for finished rows)
+        # 散布到完整大小的 (B, 1) 单步张量中（已完成行填 EOS）
         fill_val = int(eos_token_id) if eos_token_id is not None else 0
         step_full = torch.full((B, 1), fill_value=fill_val,
                                dtype=token_ids.dtype, device=device)
         step_full.index_copy_(0, active_idx, next_token_active)
         generated_full_steps.append(step_full)
 
-        # Update finished bookkeeping in full-batch coordinates
+        # 在完整批次坐标中更新完成状态记录
         if eos_token_id is not None:
             newly_finished_active = (next_token_active.squeeze(1) == eos_token_id)
             finished_full.index_put_(
@@ -477,7 +508,7 @@ def generate_text_basic_batched_cache_stop(
         if eos_token_id is not None and torch.all(finished_full):
             break
 
-        # Keep only survivors in the compute batch
+        # 计算批次中仅保留尚未完成的序列
         keep_mask_active = ~newly_finished_active
         if keep_mask_active.ndim == 0:
             keep_any = bool(keep_mask_active.item())
@@ -486,25 +517,25 @@ def generate_text_basic_batched_cache_stop(
         if not keep_any:
             break
 
-        next_token_survivors = next_token_active[keep_mask_active]  # (B_surv, 1)
+        next_token_survivors = next_token_active[keep_mask_active]  # 形状：(B_surv, 1)
         active_idx = active_idx[keep_mask_active]
 
-        # Shrink attn mask and append a "1" for the generated token
+        # 缩减注意力掩码，并为生成的词元追加一个 "1"
         if cur_attn_active is not None:
             cur_attn_active = cur_attn_active[keep_mask_active]
             ones = torch.ones((cur_attn_active.size(0), 1),
                               dtype=cur_attn_active.dtype, device=device)
             cur_attn_active = torch.cat([cur_attn_active, ones], dim=1)
 
-        # Shrink KV cache along batch dim to survivors
+        # 沿批次维度将 KV 缓存缩减到尚未完成的序列
         shrink_kv_cache_inplace(cache, keep_mask_active, model.cfg["n_layers"])
 
-        # Advance one token for survivors only
+        # 仅为尚未完成的序列向前生成一个词元
         out = model(next_token_survivors, cache=cache, attn_mask=cur_attn_active)[:, -1]
 
-    # Concatenate per-step tensors; return only the generated part
+    # 拼接逐步张量；只返回生成部分
     if generated_full_steps:
-        return torch.cat(generated_full_steps, dim=1)  # (B, L_generated)
+        return torch.cat(generated_full_steps, dim=1)  # 形状：(B, L_generated)
     else:
         return torch.empty((B, 0), dtype=token_ids.dtype, device=device)
 
@@ -518,9 +549,7 @@ def generate_text_basic_batched_stream_cache_stop(
     attn_mask: torch.Tensor | None = None,
     pad_id: int | None = None,
 ):
-    """
-    Same as generate_text_basic_batched_stream_cache but
-    with per-sequence early stop.
+    """与 generate_text_basic_batched_stream_cache 相同，但支持各序列独立提前停止。
     """
     device = token_ids.device
     model.eval()
@@ -540,9 +569,9 @@ def generate_text_basic_batched_stream_cache_stop(
     cur_attn_active = attn_mask
 
     for _ in range(max_new_tokens):
-        next_token_active = torch.argmax(out, dim=-1, keepdim=True)  # (B_active, 1)
+        next_token_active = torch.argmax(out, dim=-1, keepdim=True)  # 形状：(B_active, 1)
 
-        # Build full-sized step to yield
+        # 构建完整大小的单步张量并产出
         fill_val = int(eos_token_id) if eos_token_id is not None else 0
         step_full = torch.full((B, 1), fill_value=fill_val,
                                dtype=token_ids.dtype, device=device)
@@ -559,7 +588,7 @@ def generate_text_basic_batched_stream_cache_stop(
                 next_token_active.squeeze(1), dtype=torch.bool, device=device
             )
 
-        # Yield before shrinking so callers still see exactly one (B,1) per step
+        # 在缩减前产出，使调用方每一步仍恰好看到一个 (B, 1) 张量
         yield step_full
 
         if eos_token_id is not None and torch.all(finished_full):
@@ -587,7 +616,13 @@ def generate_text_basic_batched_stream_cache_stop(
         out = model(next_token_survivors, cache=cache, attn_mask=cur_attn_active)[:, -1]
 
 
-def load_model_and_tokenizer(which_model, device, use_compile, local_dir="qwen3"):
+def load_model_and_tokenizer(
+    which_model,
+    device,
+    use_compile,
+    local_dir="qwen3",
+    float32_upcast=True,
+):
     if which_model == "base":
 
         download_qwen3_small(
@@ -614,9 +649,9 @@ def load_model_and_tokenizer(which_model, device, use_compile, local_dir="qwen3"
         )
 
     else:
-        raise ValueError(f"Invalid choice: which_model={which_model}")
+        raise ValueError(f"无效选项：which_model={which_model}")
 
-    model = Qwen3Model(QWEN_CONFIG_06_B)
+    model = Qwen3Model(QWEN_CONFIG_06_B, float32_upcast=float32_upcast)
     model.load_state_dict(torch.load(model_path))
 
     model.to(device)
