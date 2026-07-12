@@ -1,6 +1,6 @@
 # Copyright (c) Sebastian Raschka under Apache License 2.0 (see LICENSE.txt)
-# Source for "Build a Reasoning Model (From Scratch)": https://mng.bz/lZ5B
-# Code repository: https://github.com/rasbt/reasoning-from-scratch
+# 《从零构建推理模型》来源：https://mng.bz/lZ5B
+# 代码仓库：https://github.com/rasbt/reasoning-from-scratch
 
 
 import math
@@ -104,11 +104,11 @@ def test_prompt_builders_embed_question_and_context():
 def test_self_refinement_loop_accepts_improving_revisions(monkeypatch):
     responses = iter(
         [
-            "initial draft",                # initial generation
-            "first critique",               # critique 1
-            "draft with more detail",       # refine 1 (accepted)
-            "second critique",              # critique 2
-            "bad",                          # refine 2 (rejected)
+            "initial draft",                # 初始生成
+            "first critique",               # 第 1 次批评
+            "draft with more detail",       # 第 1 次改进（接受）
+            "second critique",              # 第 2 次批评
+            "bad",                          # 第 2 次改进（拒绝）
         ]
     )
     prompts_seen = []

@@ -1,10 +1,10 @@
 # Copyright (c) Sebastian Raschka under Apache License 2.0 (see LICENSE.txt)
-# Source for "Build a Reasoning Model (From Scratch)": https://mng.bz/lZ5B
-# Code repository: https://github.com/rasbt/reasoning-from-scratch
+# 《从零构建推理模型》来源：https://mng.bz/lZ5B
+# 代码仓库：https://github.com/rasbt/reasoning-from-scratch
 
-# Runs the model similar to chapter 2 and 3 in streaming mode with the least
-# amount of bells and whistles. Uses KV caching by default.
-# Similar to generate_simple.py but uses an interactive REPL (without memory).
+# 以类似第 2、3 章的方式，用最精简的流式模式运行模型
+# 默认使用 KV 缓存，不加入额外复杂功能。
+# 与 generate_simple.py 类似，但使用不带记忆的交互式 REPL。
 
 import argparse
 from pathlib import Path
@@ -15,7 +15,7 @@ from reasoning_from_scratch.ch02 import (
     get_device,
     generate_stats
 )
-from reasoning_from_scratch.ch02_ex import (
+from reasoning_from_scratch.ch02 import (
     generate_text_basic_stream_cache
 )
 from reasoning_from_scratch.qwen3 import (
@@ -25,29 +25,29 @@ from reasoning_from_scratch.qwen3 import (
     QWEN_CONFIG_06_B
 )
 
-parser = argparse.ArgumentParser(description="Run Qwen3 text generation (interactive REPL)")
+parser = argparse.ArgumentParser(formatter_class=argparse.ArgumentDefaultsHelpFormatter, description="运行 Qwen3 文本生成（交互式 REPL）")
 parser.add_argument(
     "--device",
     type=str,
     default=None,
-    help="Device to run on (e.g. 'cpu', 'cuda', 'mps'). "
-         "If not provided, will auto-detect with get_device()."
+    help="运行设备（例如 'cpu'、'cuda'、'mps'）。"
+         "未提供时使用 get_device() 自动检测。"
 )
 parser.add_argument(
     "--max_new_tokens",
     type=int,
     default=2048,
-    help="Maximum number of new tokens to generate (default: 2048)."
+    help="要生成的最大新词元数。"
 )
 parser.add_argument(
     "--compile",
     action="store_true",
-    help="Compile PyTorch model (default: False)."
+    help="编译 PyTorch 模型。"
 )
 parser.add_argument(
     "--reasoning",
     action="store_true",
-    help="Use reasoning model variant (default: False)."
+    help="使用推理模型变体。"
 )
 
 args = parser.parse_args()
@@ -93,7 +93,7 @@ print(f"reasoning : {args.reasoning}")
 print("memory    : False")
 print("=" * 60)
 print()
-print("Interactive REPL (no memory). Type '\exit' or '\quit' to quit.\n")
+print("交互式 REPL（无记忆）。输入 '\\exit' 或 '\\quit' 退出。\n")
 
 
 def run_once(prompt: str):
@@ -123,13 +123,12 @@ def run_once(prompt: str):
         torch.tensor(all_token_ids),
         tokenizer,
         start_time,
-        end_time,
-        print_tokens=False
+        end_time
     )
     print("-" * 60)
 
 
-# REPL loop
+# REPL 循环
 try:
     while True:
         try:
@@ -137,7 +136,7 @@ try:
         except EOFError:
             print("")
             break
-        if user_in.lower() in {"\exit", "\quit"}:
+        if user_in.lower() in {r"\exit", r"\quit"}:
             break
         if not user_in:
             continue
@@ -147,4 +146,4 @@ try:
         print(user_in + "\n")
         run_once(user_in)
 except KeyboardInterrupt:
-    print("\nInterrupted by user.")
+    print("\n已由用户中断。")

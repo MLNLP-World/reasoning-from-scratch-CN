@@ -1,8 +1,11 @@
 # Copyright (c) Sebastian Raschka under Apache License 2.0 (see LICENSE.txt)
-# Source for "Build a Reasoning Model (From Scratch)": https://mng.bz/lZ5B
-# Code repository: https://github.com/rasbt/reasoning-from-scratch
+# 《从零构建推理模型》来源：https://mng.bz/lZ5B
+# 代码仓库：https://github.com/rasbt/reasoning-from-scratch
 
+from pathlib import Path
 import json
+import os
+import pytest
 import sympy as sp
 import torch
 import reasoning_from_scratch.ch03 as ch03
@@ -21,11 +24,102 @@ class DummyTokenizer:
         return "".join(self._map.get(i, "?") for i in ids)
 
 
+run_real_download = os.environ.get("RUN_REAL_DOWNLOAD_TESTS", "0") == "1"
+skip_expensive = os.environ.get("SKIP_EXPENSIVE", "0") == "1"
+
+
+def test_load_math500_test_has_500_entries():
+    repo_root = Path(__file__).resolve().parent.parent
+    local_path = repo_root / "math500_test.json"
+
+    data = ch03.load_math500_test(local_path=local_path, save_copy=False)
+
+    assert len(data) == 500
+
+
+@pytest.mark.skipif(
+    skip_expensive or not run_real_download,
+    reason="Set RUN_REAL_DOWNLOAD_TESTS=1 and unset SKIP_EXPENSIVE to run real download tests",
+)
+def test_load_math500_test_real_download(tmp_path):
+    local_path = tmp_path / "math500_test.json"
+
+    data = ch03.load_math500_test(local_path=local_path, save_copy=True)
+
+    assert local_path.exists()
+    assert len(data) == 500
+    assert {"problem", "answer"} <= data[0].keys()
+
+
+@pytest.mark.skipif(
+    skip_expensive or not run_real_download,
+    reason="Set RUN_REAL_DOWNLOAD_TESTS=1 and unset SKIP_EXPENSIVE to run real download tests",
+)
+@pytest.mark.parametrize(
+    ("which_model", "expected_name", "expected_eos"),
+    [
+        ("base", "tokenizer-base.json", "<|endoftext|>"),
+        ("reasoning", "tokenizer-reasoning.json", "<|im_end|>"),
+    ],
+)
+def test_load_tokenizer_only_real_download(
+    which_model, expected_name, expected_eos, tmp_path
+):
+    tokenizer = ch03.load_tokenizer_only(which_model=which_model, local_dir=tmp_path)
+
+    assert (tmp_path / expected_name).exists()
+    assert tokenizer.eos_token == expected_eos
+    assert len(tokenizer.encode("Explain large language models.")) > 0
+
+
+def test_math500_parser_self_answers():
+    repo_root = Path(__file__).resolve().parent.parent
+    local_path = repo_root / "math500_test.json"
+
+    math_data = ch03.load_math500_test(local_path=local_path, save_copy=False)
+
+    correct = 0
+    for entry in math_data:
+        correct += ch03.grade_answer(entry["answer"], entry["answer"])
+
+    assert correct == 500
+
+
+def test_math500_parser_boxed_answers():
+    repo_root = Path(__file__).resolve().parent.parent
+    local_path = repo_root / "math500_test.json"
+
+    math_data = ch03.load_math500_test(local_path=local_path, save_copy=False)
+
+    correct = 0
+    for entry in math_data:
+        boxed = f"\\boxed{{{entry['answer']}}}"
+        extract = ch03.extract_final_candidate(boxed)
+        correct += ch03.grade_answer(extract, entry["answer"])
+
+    assert correct == 500
+
+
+def test_math500_parser_boxed_constant_mismatch():
+    repo_root = Path(__file__).resolve().parent.parent
+    local_path = repo_root / "math500_test.json"
+
+    math_data = ch03.load_math500_test(local_path=local_path, save_copy=False)
+
+    correct = 0
+    for entry in math_data:
+        boxed = "\\boxed{123}"
+        extract = ch03.extract_final_candidate(boxed)
+        correct += ch03.grade_answer(extract, entry["answer"])
+
+    assert correct == 0
+
+
 def test_generate_text_stream_concat(monkeypatch):
-    # Stub the underlying streaming generator to avoid any real compute
+    # 替换底层流式生成器，避免真实计算
     def fake_stream(**kwargs):
         for t in (1, 2, 1):
-            yield torch.tensor([t])  # matches squeeze(0) in the function
+            yield torch.tensor([t])  # 与函数中的 squeeze(0) 对应
 
     monkeypatch.setattr(ch03, "generate_text_basic_stream_cache", fake_stream)
 
@@ -46,12 +140,12 @@ def test_get_last_boxed():
 
     cases = [
         (r"foo \boxed{42}", "42"),
-        (r"\boxed{a} bla \boxed{b+c}", "b+c"),   # picks last
-        (r"noise \boxed   {  x^2 } end", "  x^2 "),  # allows spaces
-        (r"\boxed{outer {inner} ok}", "outer {inner} ok"),  # nesting
-        (r"nothing here", None),  # missing boxed
-        (r"\boxed  not_brace", None),  # no opening {
-        (r"\boxed{unbalanced", None),  # unbalanced
+        (r"\boxed{a} bla \boxed{b+c}", "b+c"),   # 选择最后一个
+        (r"noise \boxed   {  x^2 } end", "  x^2 "),  # 允许空格
+        (r"\boxed{outer {inner} ok}", "outer {inner} ok"),  # 嵌套
+        (r"nothing here", None),  # 缺少 boxed
+        (r"\boxed  not_brace", None),  # 没有左花括号 {
+        (r"\boxed{unbalanced", None),  # 不平衡
     ]
 
     for i, (text, expected) in enumerate(cases, 1):
@@ -71,7 +165,7 @@ def test_extract_final_candidate():
         (r"Nested braces \boxed{outer {inner} ok}", "outer {inner} ok"),
         (r"In math mode: $ \boxed{ \dfrac{14}{3} } $", r"\dfrac{14}{3}"),
 
-        # Fallbacks without \boxed{...}
+        # 不含 \boxed{...} 时的回退情况
         ("Some steps...\nFinal Answer: 14/3", "14/3"),
         ("All done. 1 \nFinal 2 answer: ", "2"),
     ]
@@ -83,24 +177,28 @@ def test_extract_final_candidate():
 
 def test_normalize():
     cases = [
-        # Basic whitespace trimming
+        # 基础空白清理
         ("  3/4  ", "3/4"),
         ("\n\t  (1, 2)  \t", "(1, 2)"),
 
-        # LaTeX math mode and spacing
+        # LaTeX 数学模式和间距
         ("$2/3$", "2/3"),
         (r"\( 2/3 \)", "2/3"),
         (r"\left(1,\,2\right)", "(1,2)"),
 
-        # Fractions
+        # 分数
         (r"\frac{3}{4}", "(3)/(4)"),
         (r"\dfrac{14}{3}", "(14)/(3)"),
         (r"(3)/(4)", "(3)/(4)"),
 
-        # Roots (don’t simplify math here but just normalize text)
+        # 多项选择标签
+        ("c. 3", "3"),
+        ("b: 2", "2"),
+
+        # 根式（这里不化简数学表达式，只归一化文本）
         (r"\sqrt{2}", "sqrt(2)"),
 
-        # Braces removal
+        # 移除花括号
         (r"{x}", "x"),
         (r"{ (1, 2) }", "(1, 2)"),
     ]
@@ -128,13 +226,16 @@ def test_sympy_parser():
     for i, (expr, expected) in enumerate(success_cases, 1):
         got = ch03.sympy_parser(expr)
         assert got is not None, f"case {i} produced None for {expr!r}"
-        # Numeric/symbolic equivalence
+        # 数值/符号等价性
         assert sp.simplify(got - expected) == 0, f"{expr!r}: {got!r} != {expected!r}"
 
+    long_expr = "1" * 2001
     failure_cases = [
-        "sqrt(",  # unbalanced
-        "??",  # invalid tokens
-        "2**",  # incomplete operator
+        "sqrt(",  # 不平衡
+        "??",  # 无效词元
+        "2**",  # 不完整的运算符
+        None,  # 防止输入缺失
+        long_expr,  # 防止输入过长
     ]
     for expr in failure_cases:
         assert ch03.sympy_parser(expr) is None, f"expected None for {expr!r}"
@@ -262,7 +363,7 @@ def test_render_prompt():
         assert got.endswith("Answer:")
 
 
-def test_evaluate_math500_stream(tmp_path, monkeypatch):
+def test_evaluate_math500_stream(tmp_path, monkeypatch, qwen3_weights_path):
 
     outputs = iter([
         "Reasoning...\n\\boxed{A}",
@@ -279,10 +380,15 @@ def test_evaluate_math500_stream(tmp_path, monkeypatch):
         {"problem": "Compute #2", "answer": "B"},
     ]
 
+    tokenizer = ch03.load_tokenizer_only(
+        which_model="base",
+        local_dir=qwen3_weights_path,
+    )
+
     out_path = tmp_path / "math500-test.jsonl"
     num_correct, num_examples, acc = ch03.evaluate_math500_stream(
         model=None,
-        tokenizer=None,
+        tokenizer=tokenizer,
         device="cpu",
         math_data=math_data,
         out_path=out_path,

@@ -62,7 +62,7 @@ uv run compare_inference.py
 &nbsp;
 ### 标准模型
 
-| Model    | Mode              | Command                         | Hardware        | Tokens/sec    | GPU Memory (VRAM) |
+| 模型     | 模式              | 命令                            | 硬件            | 词元/秒       | GPU 内存（VRAM） |
 | -------- | ----------------- | ------------------------------- | --------------- | ------------- | ----------------- |
 | qwen3.py | Regular           | --device cpu                    | Mac Mini M4 CPU | 6             | -                 |
 | qwen3.py | Regular compiled  | --device cpu --compile          | Mac Mini M4 CPU | 6             | -                 |
@@ -84,7 +84,7 @@ uv run compare_inference.py
 &nbsp;
 ### 优化模型
 
-| Model              | Mode              | Command                                     | Hardware        | Tokens/sec | GPU Memory (VRAM) |
+| 模型               | 模式              | 命令                                        | 硬件            | 词元/秒    | GPU 内存（VRAM） |
 | ------------------ | ----------------- | ------------------------------------------- | --------------- | ---------- | ----------------- |
 | qwen3_optimized.py | Regular           | --optimized --device cpu                    | Mac Mini M4 CPU | 5          | -                 |
 | qwen3_optimized.py | Regular compiled  | --optimized --device cpu --compile          | Mac Mini M4 CPU | 7          | -                 |

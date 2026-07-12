@@ -1,6 +1,6 @@
 # Copyright (c) Sebastian Raschka under Apache License 2.0 (see LICENSE.txt)
-# Source for "Build a Reasoning Model (From Scratch)": https://mng.bz/lZ5B
-# Code repository: https://github.com/rasbt/reasoning-from-scratch
+# 《从零构建推理模型》来源：https://mng.bz/lZ5B
+# 代码仓库：https://github.com/rasbt/reasoning-from-scratch
 
 import argparse
 import json
@@ -33,49 +33,49 @@ def parse_args():
         "--device",
         type=str,
         default="auto",
-        help="Device to use: 'auto', or any torch device string like 'cpu', 'cuda', 'cuda:0', 'mps'.",
+        help="使用的设备：'auto'，或 'cpu'、'cuda'、'cuda:0'、'mps' 等 torch 设备字符串。",
     )
     parser.add_argument(
         "--which_model",
         type=str,
         default="base",
         choices=["base", "reasoning", "instruct"],
-        help="Model variant to load",
+        help="要加载的模型变体",
     )
     parser.add_argument(
         "--dataset_size",
         type=int,
         default=10,
-        help="Number of MATH-500 examples to evaluate",
+        help="要评估的 MATH-500 样本数",
     )
     parser.add_argument(
         "--max_new_tokens",
         type=int,
         default=2048,
-        help="Max new tokens for generation",
+        help="生成的最大新词元数",
     )
     parser.add_argument(
         "--compile",
         action="store_true",
-        help="Enable torch.compile for the model.",
+        help="为模型启用 torch.compile。",
     )
     parser.add_argument(
         "--checkpoint_path",
         type=str,
         default=None,
-        help="Optional path to a .pth checkpoint to load model weights from.",
+        help="用于加载模型权重的可选 .pth 检查点路径。",
     )
     parser.add_argument(
         "--verbose",
         action="store_true",
-        help="Print per-sample correctness while evaluating.",
+        help="评估时输出每个样本是否正确。",
     )
     parser.add_argument(
         "--hybrid_parser",
         action="store_true",
         help=(
-            "Use the advanced hybrid parser for answer grading instead of the "
-            "default chapter parser."
+            "使用高级混合解析器而不是"
+            "本章默认解析器进行答案评分。"
         ),
     )
     return parser.parse_args()
@@ -143,16 +143,16 @@ def evaluate_math500_stream_hybrid(
                     f"\n\n{'='*50}\n{progress_msg}\n"
                     f"{'='*50}\nExtracted: {extracted}\n"
                     f"Expected:  {row['answer']}\n"
-                    f"Correct so far: {num_correct}\n{'-'*50}"
+                    f"当前正确数： {num_correct}\n{'-'*50}"
                 )
 
     seconds_elapsed = time.time() - start_time
     acc = num_correct / num_examples if num_examples else 0.0
     print(f"\nAccuracy: {acc*100:.1f}% ({num_correct}/{num_examples})")
-    print(f"Total time: {seconds_elapsed/60:.1f} min")
+    print(f"总耗时： {seconds_elapsed/60:.1f} min")
     avg_len = total_len / num_examples
-    print(f"Average response length: {avg_len:.2f} tokens")
-    print(f"Logs written to: {out_path}")
+    print(f"平均回复长度： {avg_len:.2f} tokens")
+    print(f"日志已写入： {out_path}")
     return num_correct, num_examples, acc
 
 
@@ -180,7 +180,7 @@ if __name__ == "__main__":
         which_model = args.which_model
 
     if args.checkpoint_path:
-        # To load the saved RL checkpoint files from chapter 6
+        # 加载第 6 章保存的强化学习检查点文件
         tokenizer = load_tokenizer_only(which_model=which_model)
         model = Qwen3Model(QWEN_CONFIG_06_B)
         state_dict = torch.load(args.checkpoint_path, map_location="cpu")
@@ -204,7 +204,7 @@ if __name__ == "__main__":
 
     if args.hybrid_parser:
         backend_ok = bonus.normalize_text_hybrid(r"\frac{1}{2}") == "1/2"
-        print("LaTeX backend ready:", backend_ok)
+        print("LaTeX 后端已就绪：", backend_ok)
         if not backend_ok:
             print('Suggestion: uv pip install "antlr4-python3-runtime==4.11.*"')
 

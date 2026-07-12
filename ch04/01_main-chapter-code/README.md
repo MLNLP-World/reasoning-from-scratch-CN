@@ -1,7 +1,7 @@
-# Chapter 4: Improving Reasoning with Inference-Time Scaling
+# 第 4 章：通过推理时扩展改进推理能力
 
 &nbsp;
-## Main chapter code
+## 主要章节代码
 
-- [ch04_main.ipynb](ch04_main.ipynb): main chapter code
-- [ch04_exercise-solutions.ipynb](ch04_exercise-solutions.ipynb): exercise solutions
+- [ch04_main.ipynb](ch04_main.ipynb)：主要章节代码
+- [ch04_exercise-solutions.ipynb](ch04_exercise-solutions.ipynb)：练习解答

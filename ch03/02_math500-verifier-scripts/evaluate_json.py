@@ -1,6 +1,6 @@
 # Copyright (c) Sebastian Raschka under Apache License 2.0 (see LICENSE.txt)
-# Source for "Build a Reasoning Model (From Scratch)": https://mng.bz/lZ5B
-# Code repository: https://github.com/rasbt/reasoning-from-scratch
+# 《从零构建推理模型》来源：https://mng.bz/lZ5B
+# 代码仓库：https://github.com/rasbt/reasoning-from-scratch
 
 import argparse
 import json
@@ -18,19 +18,19 @@ def parse_args():
         "--json_path",
         type=str,
         required=True,
-        help="Path to the records file (.json or .jsonl).",
+        help="记录文件（.json 或 .jsonl）的路径。",
     )
     parser.add_argument(
         "--gtruth_answer",
         type=str,
         default="gtruth_answer",
-        help="Key name for the ground-truth answer",
+        help="真实答案的键名",
     )
     parser.add_argument(
         "--generated_text",
         type=str,
         default="generated_text",
-        help="Key name for generated model output",
+        help="模型生成输出的键名",
     )
     return parser.parse_args()
 
@@ -38,7 +38,7 @@ def parse_args():
 def load_records(json_path):
     path = Path(json_path)
     if not path.exists():
-        raise FileNotFoundError(f"Input file not found: {path}")
+        raise FileNotFoundError(f"找不到输入文件： {path}")
 
     with path.open("r", encoding="utf-8") as f:
         try:
@@ -54,7 +54,7 @@ def load_records(json_path):
                     records.append(json.loads(line))
                 except json.JSONDecodeError as exc:
                     raise ValueError(
-                        f"Invalid JSON on line {line_num} in {path}: {exc}"
+                        f"以下行包含无效 JSON： {line_num} in {path}: {exc}"
                     ) from exc
             return records
 
@@ -66,7 +66,7 @@ def load_records(json_path):
         return [parsed]
 
     raise ValueError(
-        f"Unsupported JSON root type in {path}: {type(parsed).__name__}"
+        f"不支持的 JSON 根类型，文件： {path}: {type(parsed).__name__}"
     )
 
 
@@ -77,13 +77,13 @@ def evaluate_records(records, gtruth_key, generated_text_key):
     for idx, record in enumerate(records, start=1):
         if not isinstance(record, dict):
             raise ValueError(
-                f"Record {idx} is not a JSON object: {type(record).__name__}"
+                f"Record {idx} 不是 JSON 对象： {type(record).__name__}"
             )
 
         if gtruth_key not in record:
-            raise KeyError(f"Record {idx} is missing key: {gtruth_key}")
+            raise KeyError(f"Record {idx} 缺少键： {gtruth_key}")
         if generated_text_key not in record:
-            raise KeyError(f"Record {idx} is missing key: {generated_text_key}")
+            raise KeyError(f"Record {idx} 缺少键： {generated_text_key}")
 
         extracted = extract_final_candidate(record[generated_text_key])
         is_correct = grade_answer(extracted, record[gtruth_key])

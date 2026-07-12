@@ -303,7 +303,7 @@ uv run self_consistency_scorer_math500.py \
 
 &nbsp;
 
-## Best-of-N
+## Best-of-N（N 选优）
 
 [`self_consistency_scorer_math500.py`](self_consistency_scorer_math500.py) 实现了 Best-of-N 推理时扩展方法。
 

@@ -6,6 +6,7 @@
 
 - [cot_prompting_math500.py](cot_prompting_math500.py)：可在 MATH-500 数据集上运行链式思维（CoT）提示的独立脚本
 - [self_consistency_math500.py](self_consistency_math500.py)：可在 MATH-500 数据集上运行自洽采样的独立脚本
+- [run_all_experiments_math500.sh](run_all_experiments_math500.sh)：运行下方 README 表格中全部实验（第 4–12 行）的便捷 Bash 脚本
 
 这两个评估脚本都会复用 [`reasoning_from_scratch`](../../reasoning_from_scratch) 包中的功能，避免重复造轮子。（安装细节见[第2章环境配置说明](../../ch02/02_setup-tips/python-instructions.md)。）
 
@@ -21,7 +22,7 @@
 
 ## 链式思维提示（Chain-of-Thought Prompting）
 
-[cot_prompting_math500.py](cot_prompting_math500.py) 对应第3章介绍的 CoT 方法。
+[cot_prompting_math500.py](cot_prompting_math500.py) 实现第 4 章介绍的思维链提示方法。
 
 <img src="https://sebastianraschka.com/images/reasoning-from-scratch-images/ch04/CH04_F04_raschka.webp" width=600>
 
@@ -32,6 +33,8 @@
 | 1  | 基线（第3章），贪心解码                  | Base  | 15.2%  | 10.1 分钟 |
 | 2  | 基线（第3章），贪心解码                  | Reasoning | 48.2% | 182.1 分钟 |
 | 3  | 链式思维提示（“CoT”）                    | Base  | 40.6%  | 84.5 分钟 |
+
+表中的准确率和运行时间使用 "cuda" GPU（DGX Spark）在 MATH-500 测试集全部 500 个样本上计算。
 
 要复现第 1 行实验：
 
@@ -54,7 +57,7 @@ uv run cot_prompting_math500.py \
 &nbsp;
 ## 自洽采样（Self-Consistency Sampling）
 
-[self_consistency_math500.py](self_consistency_math500.py) 实现第3章介绍的自洽采样流程。（可选地，也提供一个 [self_consistency_math500_batched.py](self_consistency_math500_batched.py) 批处理版本，能把全部 `--num_samples` 当作一个批次执行，以加速运算，不过会消耗更多显存/内存。）
+[self_consistency_math500.py](self_consistency_math500.py) 实现第 4 章介绍的自洽采样方法。（可选地，也提供一个 [self_consistency_math500_batched.py](self_consistency_math500_batched.py) 批处理版本，能把全部 `--num_samples` 当作一个批次执行，以加速运算，不过会消耗更多显存/内存。）
 
 <img src="https://sebastianraschka.com/images/reasoning-from-scratch-images/ch04/CH04_F17_raschka.webp" width=600>
 
@@ -74,6 +77,8 @@ uv run cot_prompting_math500.py \
 | 10  | 自洽（n=5） + Top-p + CoT              | Base  | 48.0%  | 452.9 分钟 |
 | 11  | 自洽（n=10） + Top-p + CoT             | Base  | 52.0%  | 862.6 分钟 |
 | 12  | 自洽（n=3） + Top-p + CoT              | Reasoning | 55.2% | 544.4 分钟 |
+
+表中的准确率和运行时间使用 "cuda" GPU（DGX Spark）在 MATH-500 测试集全部 500 个样本上计算。
 
 以下命令可复现各行实验（若不用 `uv`，将 `uv run` 换成 `python`）。
 

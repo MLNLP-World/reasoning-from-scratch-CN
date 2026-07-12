@@ -1,98 +1,94 @@
-# Tests
+# 测试
 
-This directory contains the repository's Python test suite.
+此目录包含仓库的 Python 测试套件。
 
-## Local runs
+## 本地运行
 
-Install the dev environment first:
+首先安装开发环境：
 
 ```bash
 uv sync --group dev
 ```
 
-### 1. Normal suite, ignoring expensive tests  (recommended)
+### 1. 常规测试套件，忽略高成本测试（推荐）
 
-This is recommended for quick testing and development of new features.
+建议使用此方式快速测试和开发新功能。
 
 ```bash
 SKIP_EXPENSIVE=1 RUN_REAL_DOWNLOAD_TESTS=0 uv run pytest tests
 ```
 
-Run a single test file:
+运行单个测试文件：
 
 ```bash
 SKIP_EXPENSIVE=1 RUN_REAL_DOWNLOAD_TESTS=0 uv run pytest tests/test_ch03.py
 ```
 
+这是最接近默认 GitHub 测试矩阵的本地运行方式。
 
-This is the closest local equivalent to the default GitHub test matrix.
+### 2. 常规测试套件加高成本测试
 
-### 2. Normal suite plus expensive tests
-
-There are some codes that are ignored by default, because they are relatively expensive to run. I recommend running these tests if you are finished with the basic debugging.
+一些代码测试默认被忽略，因为运行成本较高。完成基础调试后，建议运行这些测试。
 
 ```bash
 SKIP_EXPENSIVE=0 RUN_REAL_DOWNLOAD_TESTS=0 uv run pytest tests
 ```
 
-Note that this runs tests guarded by `SKIP_EXPENSIVE` in the test files, but it still excludes the real network/download integration tests that download large model checkpoints.
+请注意，这会运行测试文件中受 `SKIP_EXPENSIVE` 控制的测试，但仍会排除下载大型模型检查点的真实网络/下载集成测试。
 
-### 3. Download tests only
+### 3. 仅运行下载测试
 
-There are some tests that check whether the model checkpoint files are available for download and the servers (still) work. It's not necessary to run these tests locally or a regular basis. This is more meant for occasional testing.
+一些测试用于检查模型检查点文件能否下载，以及服务器是否仍正常工作。无需经常在本地运行，它们主要用于偶尔检查。
 
-To run these download tests, use:
+使用以下命令运行下载测试：
 
 ```bash
 SKIP_EXPENSIVE=0 RUN_REAL_DOWNLOAD_TESTS=1 uv run pytest tests -k real_download
 ```
 
-How this works:
+工作方式：
 
-- `pytest tests` collects tests from the `tests/` directory
-- `-k real_download` keeps only tests whose names contain `real_download`
+- `pytest tests` 收集 `tests/` 目录中的测试
+- `-k real_download` 只保留名称中包含 `real_download` 的测试
 
-For a more targeted example, for example, to run the appendix D real snapshot test directly, use:
+更有针对性的示例：要直接运行附录 D 的真实快照测试，请使用：
 
 ```bash
 SKIP_EXPENSIVE=0 RUN_REAL_DOWNLOAD_TESTS=1 uv run pytest tests/test_appendix_d.py -k real_download_1_7b
 ```
 
-The opt-in real-download tests currently cover:
+当前需显式启用的真实下载测试包括：
 
-- `tests/test_ch03.py`: real `math500_test.json` download and tokenizer downloads
-- `tests/test_ch06.py`: real math training set download
-- `tests/test_ch07.py`: real GitHub raw file download
-- `tests/test_ch08.py`: real distillation dataset and tokenizer downloads
-- `tests/test_appendix_d.py`: real `Qwen/Qwen3-1.7B-Base` snapshot download
-- `tests/test_qwen3.py`: real `Qwen/Qwen3-0.6B` tokenizer comparison
+- `tests/test_ch03.py`：真实下载 `math500_test.json` 和分词器
+- `tests/test_ch06.py`：真实下载数学训练集
+- `tests/test_ch07.py`：真实下载 GitHub 原始文件
+- `tests/test_ch08.py`：真实下载蒸馏数据集和分词器
+- `tests/test_appendix_d.py`：真实下载 `Qwen/Qwen3-1.7B-Base` 快照
+- `tests/test_qwen3.py`：真实比较 `Qwen/Qwen3-0.6B` 分词器
 
+### 4. 运行全部测试（不推荐）
 
-### 4. Everything (not recommended)
-
-This runs everything in the test suite. Note that this includes the computationally expensive tests (section 3) as well as the expenive download tests (section 4).
+这会运行测试套件中的所有内容，包括计算成本较高的测试和下载测试。
 
 ```bash
 SKIP_EXPENSIVE=0 RUN_REAL_DOWNLOAD_TESTS=1 uv run pytest tests
 ```
 
-This is not recommended for routine tests when making code changes, because the file downloads are very expensive and unnecessary to run on a regular basis.
+不建议在常规代码修改期间使用，因为文件下载成本很高，也没有必要频繁运行。
 
+## GitHub CI 中运行的内容
 
-## What runs in GitHub CI
-
-The default GitHub test matrix runs the normal suite and omits heavier tests:
+默认 GitHub 测试矩阵运行常规测试套件，并省略较重的测试：
 
 - `.github/workflows/tests-linux.yml`
 - `.github/workflows/tests-macos.yml`
 - `.github/workflows/tests-windows.yml`
 - `.github/workflows/basic-tests-pip.yml`
 
-These workflows set `SKIP_EXPENSIVE=1`, so expensive tests are skipped there. The reason is that the GitHub CI does not have the necessary computational resources (like a GPU) to run the expensive tests.
+这些工作流设置 `SKIP_EXPENSIVE=1`，因此会跳过高成本测试。原因是 GitHub CI 没有运行这些测试所需的计算资源（例如 GPU）。
 
-The real network/download integration tests run in a separate workflow:
+真实网络/下载集成测试在单独的工作流中运行：
 
 - `.github/workflows/real-download-tests.yml`
 
-That workflow sets `RUN_REAL_DOWNLOAD_TESTS=1` and runs only tests selected by `-k real_download`.
-It is not part of the default PR/push matrix. It runs on a weekly schedule and can also be started manually via `workflow_dispatch`.
+该工作流设置 `RUN_REAL_DOWNLOAD_TESTS=1`，并只运行通过 `-k real_download` 选出的测试。它不属于默认 PR/push 矩阵，而是每周定时运行，也可以通过 `workflow_dispatch` 手动启动。

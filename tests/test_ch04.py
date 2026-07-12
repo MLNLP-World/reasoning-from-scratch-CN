@@ -1,6 +1,6 @@
 # Copyright (c) Sebastian Raschka under Apache License 2.0 (see LICENSE.txt)
-# Source for "Build a Reasoning Model (From Scratch)": https://mng.bz/lZ5B
-# Code repository: https://github.com/rasbt/reasoning-from-scratch
+# 《从零构建推理模型》来源：https://mng.bz/lZ5B
+# 代码仓库：https://github.com/rasbt/reasoning-from-scratch
 
 import pytest
 import torch
@@ -14,7 +14,7 @@ class DummyTokenizer:
         self.decode_map = {7: "X", 8: "Y"}
 
     def encode(self, prompt):
-        # Content of the prompt is irrelevant for these tests.
+        # 提示词内容与这些测试无关。
         return [1, 2]
 
     def decode(self, ids):
@@ -82,11 +82,29 @@ def test_scale_logits_by_temperature_validates_and_scales():
 def test_top_p_filter_truncates_and_renormalizes():
     probas = torch.tensor([[0.5, 0.4, 0.1]])
     filtered = ch04.top_p_filter(probas, top_p=0.6)
-    assert torch.allclose(filtered, torch.tensor([[1.0, 0.0, 0.0]]))
+    assert torch.allclose(
+        filtered, torch.tensor([[0.5555556, 0.4444444, 0.0]])
+    )
 
-    # When no filtering is needed, output should match input
+    # 不需要过滤时，输出应与输入一致
     unfiltered = ch04.top_p_filter(probas, top_p=1.0)
     assert torch.allclose(unfiltered, probas)
+
+
+def test_top_p_filter_batched_rows_renormalize_independently():
+    # 确保它也适用于批处理情况
+    probas = torch.tensor(
+        [
+            [0.40, 0.30, 0.20, 0.10, 0.00],
+            [0.05, 0.25, 0.35, 0.15, 0.20],
+        ]
+    )
+
+    filtered = ch04.top_p_filter(probas, top_p=0.70)
+
+    assert filtered.shape == probas.shape
+    assert torch.all(filtered >= 0)
+    assert torch.allclose(filtered.sum(dim=1), torch.ones(2), atol=1e-6)
 
 
 def test_generate_text_temp_stream_cache_stops_on_eos():
@@ -99,7 +117,7 @@ def test_generate_text_temp_stream_cache_stops_on_eos():
             token_ids=token_ids,
             max_new_tokens=5,
             eos_token_id=3,
-            temperature=1.0,
+            temperature=0.0,
         )
     )
 
@@ -116,7 +134,7 @@ def test_self_consistency_vote_majority(monkeypatch):
         idx = idx if idx is not None else 0
         return answers[idx % len(answers)]
 
-    # Wrap to inject call index so we can cycle through answers deterministically
+    # 包装并注入调用索引，以便确定性地循环使用答案
     call_counter = {"i": 0}
 
     def wrapped_generate(**kwargs):

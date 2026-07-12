@@ -1,6 +1,6 @@
 # Copyright (c) Sebastian Raschka under Apache License 2.0 (see LICENSE.txt)
-# Source for "Build a Reasoning Model (From Scratch)": https://mng.bz/lZ5B
-# Code repository: https://github.com/rasbt/reasoning-from-scratch
+# 《从零构建推理模型》来源：https://mng.bz/lZ5B
+# 代码仓库：https://github.com/rasbt/reasoning-from-scratch
 
 import argparse
 import json
@@ -26,48 +26,48 @@ def parse_args():
         "--device",
         type=str,
         default="auto",
-        help="Device to use: auto, cpu, cuda, cuda:0, mps, etc",
+        help="使用的设备：auto、cpu、cuda、cuda:0、mps 等。",
     )
     parser.add_argument(
         "--dataset_size",
         type=int,
         default=500,
-        help="Number of MATH-500 examples to evaluate",
+        help="要评估的 MATH-500 样本数",
     )
     parser.add_argument(
         "--which_model",
         type=str,
         default="reasoning",
         choices=["base", "reasoning", "instruct"],
-        help="Model variant to generate answers with",
+        help="用于生成答案的模型变体",
     )
     parser.add_argument(
         "--max_new_tokens",
         type=int,
         default=2048,
-        help="Max new tokens for generation",
+        help="生成的最大新词元数",
     )
     parser.add_argument(
         "--compile",
         action="store_true",
-        help="Enable torch.compile for the model.",
+        help="为模型启用 torch.compile。",
     )
     parser.add_argument(
         "--checkpoint_path",
         type=str,
         default=None,
-        help="Optional path to a .pth checkpoint to load model weights from.",
+        help="用于加载模型权重的可选 .pth 检查点路径。",
     )
     parser.add_argument(
         "--out_file",
         type=str,
         default="math500_qwen3_answers.json",
-        help="Output JSON file path",
+        help="输出 JSON 文件路径",
     )
     parser.add_argument(
         "--verbose",
         action="store_true",
-        help="Print extracted prediction for each sample.",
+        help="输出每个样本提取出的预测。",
     )
     return parser.parse_args()
 
@@ -142,4 +142,4 @@ if __name__ == "__main__":
         json.dump(rows, f, indent=2, ensure_ascii=False)
         f.write("\n")
 
-    print(f"\nWrote {len(rows)} rows to: {out_file}")
+    print(f"\nWrote {len(rows)} 行写入： {out_file}")

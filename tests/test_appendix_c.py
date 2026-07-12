@@ -1,6 +1,6 @@
 # Copyright (c) Sebastian Raschka under Apache License 2.0 (see LICENSE.txt)
-# Source for "Build a Reasoning Model (From Scratch)": https://mng.bz/lZ5B
-# Code repository: https://github.com/rasbt/reasoning-from-scratch
+# 《从零构建推理模型》来源：https://mng.bz/lZ5B
+# 代码仓库：https://github.com/rasbt/reasoning-from-scratch
 
 import os
 from pathlib import Path
@@ -12,7 +12,7 @@ from reasoning_from_scratch.ch02 import (
     generate_text_basic,
     generate_text_basic_cache,
 )
-# Local imports
+# 本地导入
 from test_qwen3 import test_model
 from conftest import import_definitions_from_notebook
 
@@ -25,7 +25,7 @@ nb_path = ROOT / "chC" / "01_main-chapter-code" / "chC_main.ipynb"
 mod = import_definitions_from_notebook(nb_path, "chC_chC_main_defs")
 Qwen3Model = getattr(mod, "Qwen3Model")
 
-# Make CI more reproducible & robust
+# 提高 CI 的可复现性和稳健性
 os.environ["MKL_NUM_THREADS"] = "1"
 os.environ["OMP_NUM_THREADS"] = "1"
 torch.backends.mkldnn.enabled = False

@@ -1,44 +1,33 @@
 
 # Copyright (c) Sebastian Raschka under Apache License 2.0 (see LICENSE.txt)
-# Source for "Build a Reasoning Model (From Scratch)": https://mng.bz/lZ5B
-# Code repository: https://github.com/rasbt/reasoning-from-scratch
+# 《从零构建推理模型》来源：https://mng.bz/lZ5B
+# 代码仓库：https://github.com/rasbt/reasoning-from-scratch
 #
-# Batched MATH-500 evaluator
+# 批处理 MATH-500 评估器
 
 import argparse
 import json
 import time
 from pathlib import Path
-import requests
 
 import torch
 
+from reasoning_from_scratch.qwen3_batched import (
+    Qwen3Model,
+    QWEN_CONFIG_06_B
+)
 from reasoning_from_scratch.ch02 import get_device
 from reasoning_from_scratch.ch03 import (
+    load_math500_test,
     render_prompt,
     extract_final_candidate,
     grade_answer,
     eta_progress_message,
+    load_tokenizer_only
 )
-from reasoning_from_scratch.qwen3_batched import load_model_and_tokenizer
-
-
-def get_data():
-    local_path = Path("math500_test.json")
-    url = (
-        "https://raw.githubusercontent.com/rasbt/reasoning-from-scratch/"
-        "main/ch03/01_main-chapter-code/math500_test.json"
-    )
-
-    if local_path.exists():
-        with local_path.open("r", encoding="utf-8") as f:
-            math_data = json.load(f)
-    else:
-        r = requests.get(url, timeout=30)
-        r.raise_for_status()
-        math_data = r.json()
-
-    return math_data
+from reasoning_from_scratch.qwen3_batched import (
+    load_model_and_tokenizer,
+)
 
 
 def evaluate_math500_batched(
@@ -54,9 +43,9 @@ def evaluate_math500_batched(
 ):
     model.eval()
 
-    # Default output path like the streaming variant
+    # 与流式版本相同的默认输出路径
     if out_path is None:
-        dev_name = str(device).replace(":", "-")  # Make filename compatible with Windows
+        dev_name = str(device).replace(":", "-")  # 使文件名兼容 Windows
         out_path = Path(f"math500-{dev_name}.jsonl")
 
     num_examples = len(math_data)
@@ -68,13 +57,13 @@ def evaluate_math500_batched(
     pad_id = getattr(tokenizer, "pad_token_id", None)
 
     with open(out_path, "w", encoding="utf-8") as f:
-        # Batched loop
+        # 批处理循环
         for start in range(0, num_examples, batch_size):
             batch = math_data[start:start + batch_size]
 
             prompts = [render_prompt(row["problem"]) for row in batch]
 
-            # Encode and left-pad
+            # 编码并在左侧填充
             tokenized = [tokenizer.encode(p) for p in prompts]
             max_len = max(len(t) for t in tokenized)
             left_padded = [
@@ -83,24 +72,24 @@ def evaluate_math500_batched(
             ]
             input_ids = torch.tensor(left_padded, device=device, dtype=torch.long)
 
-            # Generate (batched)
+            # 批量生成
             gen = generate_text_basic_batched_cache(
                 model,
                 token_ids=input_ids,
                 max_new_tokens=max_new_tokens,
                 eos_token_id=eos_id,
                 pad_id=pad_id,
-            )  # shape: (B, T_new)
+            )  # 形状：(B, T_new)
 
-            # Process each row
+            # 逐行处理
             B = gen.size(0)
             for b_idx in range(B):
-                # Match the variable names used by evaluate_math500_stream
+                # 与 evaluate_math500_stream 使用的变量名保持一致
                 i = start + b_idx + 1
                 row = batch[b_idx]
 
                 row_tokens = gen[b_idx]
-                # Cut at first EOS if present
+                # 如果存在 EOS，则在第一个 EOS 处截断
                 if eos_id is not None:
                     eos_pos = (row_tokens == eos_id).nonzero(as_tuple=True)[0]
                     if len(eos_pos) > 0:
@@ -111,7 +100,7 @@ def evaluate_math500_batched(
                 is_correct = grade_answer(extracted, row["answer"])
                 num_correct += int(is_correct)
 
-                record = {  # Record to be saved for inspection
+                record = {  # 保存记录以供检查
                     "index": i,
                     "problem": row["problem"],
                     "gtruth_answer": row["answer"],
@@ -129,70 +118,76 @@ def evaluate_math500_batched(
                     label="MATH-500",
                 )
                 print(progress_msg, end="\r", flush=True)
-                if verbose:  # Print responses during the generation process
+                if verbose:  # 在生成过程中输出回复
                     print(
                         f"\n\n{'='*50}\n{progress_msg}\n"
                         f"{'='*50}\nExtracted: {extracted}\n"
                         f"Expected:  {row['answer']}\n"
-                        f"Correct so far: {num_correct}\n{'-'*50}"
+                        f"当前正确数： {num_correct}\n{'-'*50}"
                     )
 
-    # Print summary information
+    # 输出汇总信息
     seconds_elapsed = time.time() - start_time
     acc = num_correct / num_examples if num_examples else 0.0
     print(f"\nAccuracy: {acc*100:.1f}% ({num_correct}/{num_examples})")
-    print(f"Total time: {seconds_elapsed/60:.1f} min")
-    print(f"Logs written to: {out_path}")
+    print(f"总耗时： {seconds_elapsed/60:.1f} min")
+    print(f"日志已写入： {out_path}")
     return num_correct, num_examples, acc
 
 
 def parse_args():
-    parser = argparse.ArgumentParser()
+    parser = argparse.ArgumentParser(formatter_class=argparse.ArgumentDefaultsHelpFormatter)
     parser.add_argument(
         "--device",
         type=str,
         default="auto",
-        help="Device to use: 'auto' (default), or any torch device string like 'cpu', 'cuda', 'cuda:0', 'mps'.",
+        help="使用的设备：'auto'，或 'cpu'、'cuda'、'cuda:0'、'mps' 等 torch 设备字符串。",
     )
     parser.add_argument(
         "--which_model",
         type=str,
         default="base",
         choices=["base", "reasoning", "instruct"],
-        help="Model variant to load. Defaults to 'base'.",
+        help="要加载的模型变体",
     )
     parser.add_argument(
         "--dataset_size",
         type=int,
         default=10,
-        help="Number of MATH-500 examples to evaluate. Default: 10",
+        help="要评估的 MATH-500 样本数",
     )
     parser.add_argument(
         "--max_new_tokens",
         type=int,
         default=2048,
-        help="Max new tokens for generation. Default: 2048",
+        help="生成的最大新词元数",
     )
     parser.add_argument(
         "--compile",
         action="store_true",
-        help="Enable torch.compile for the model.",
+        help="为模型启用 torch.compile。",
+    )
+    parser.add_argument(
+        "--checkpoint_path",
+        type=str,
+        default=None,
+        help="用于加载模型权重的可选 .pth 检查点路径。",
     )
     parser.add_argument(
         "--batch_size",
         type=int,
         default=4,
-        help="Batch size for batched generation. Default: 4",
+        help="批量生成的批量大小",
     )
     parser.add_argument(
         "--verbose",
         action="store_true",
-        help="Print per-sample correctness while evaluating.",
+        help="评估时输出每个样本是否正确。",
     )
     parser.add_argument(
         "--disable_efficient_mode",
         action="store_true",
-        help="Uses an alternative implementation of batched inference that is simpler but more memory and compute intense.",
+        help="使用另一种更简单、但内存与计算开销更大的批处理推理实现。",
     )
     return parser.parse_args()
 
@@ -221,19 +216,30 @@ if __name__ == "__main__":
     print("Model:", which_model)
     print("Device:", device)
     dev_name = str(device).replace(":", "-")
-    print("Batch size:", batch_size)
+    print("批量大小：", batch_size)
 
-    math_data = get_data()[:dataset_size]
+    math_data = load_math500_test()[:dataset_size]
     if args.which_model == "instruct":
         which_model = "reasoning"
     else:
         which_model = args.which_model
 
-    model, tokenizer = load_model_and_tokenizer(
-        which_model=which_model,
-        device=device,
-        use_compile=args.compile
-    )
+    if args.checkpoint_path:
+        # 加载第 6 章保存的强化学习检查点文件
+        tokenizer = load_tokenizer_only(which_model=which_model)
+        model = Qwen3Model(QWEN_CONFIG_06_B)
+        model.to(device)
+        state_dict = torch.load(args.checkpoint_path, map_location=device)
+        model.load_state_dict(state_dict)
+        if args.compile:
+            torch._dynamo.config.allow_unspec_int_on_nn_module = True
+            model = torch.compile(model)
+    else:
+        model, tokenizer = load_model_and_tokenizer(
+            which_model=which_model,
+            device=device,
+            use_compile=args.compile
+        )
     if args.which_model == "instruct":
         tokenizer.add_thinking = False
 

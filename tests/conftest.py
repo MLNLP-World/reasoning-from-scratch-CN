@@ -1,6 +1,6 @@
 # Copyright (c) Sebastian Raschka under Apache License 2.0 (see LICENSE)
-# Source for "Build a Reasoning Model (From Scratch)": https://mng.bz/lZ5B
-# Code repository: https://github.com/rasbt/reasoning-from-scratch
+# 《从零构建推理模型》来源：https://mng.bz/lZ5B
+# 代码仓库：https://github.com/rasbt/reasoning-from-scratch
 
 from reasoning_from_scratch.qwen3 import (
     download_qwen3_small,
@@ -39,7 +39,7 @@ def import_definitions_from_notebook(nb_path, module_name):
     mod = types.ModuleType(module_name)
     sys.modules[module_name] = mod
 
-    # Pass 1: execute only imports (handle multi-line)
+    # 第 1 遍：只执行导入（处理多行导入）
     for cell in nb.cells:
         if cell.cell_type != "code":
             continue
@@ -65,7 +65,7 @@ def import_definitions_from_notebook(nb_path, module_name):
                     collecting = False
                     buf = []
 
-    # Pass 2: execute only def/class definitions
+    # 第 2 遍：只执行 def/class 定义
     for cell in nb.cells:
         if cell.cell_type != "code":
             continue

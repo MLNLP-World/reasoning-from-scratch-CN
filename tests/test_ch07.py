@@ -1,6 +1,6 @@
 # Copyright (c) Sebastian Raschka under Apache License 2.0 (see LICENSE.txt)
-# Source for "Build a Reasoning Model (From Scratch)": https://mng.bz/lZ5B
-# Code repository: https://github.com/rasbt/reasoning-from-scratch
+# 《从零构建推理模型》来源：https://mng.bz/lZ5B
+# 代码仓库：https://github.com/rasbt/reasoning-from-scratch
 
 import math
 import os
@@ -63,7 +63,7 @@ def test_moving_average_uses_trailing_window_and_minimum_window_size():
     smoothed = ch07.moving_average(values, window_fraction=0.5)
     assert smoothed == [1.0, 2.0, 4.0, 6.0]
 
-    # window_fraction=0 still uses a 1-step window via max(1, ...)
+    # window_fraction=0 仍会通过 max(1, ...) 使用单步窗口
     no_smoothing = ch07.moving_average(values, window_fraction=0.0)
     assert no_smoothing == values
 
@@ -220,10 +220,10 @@ def test_reward_format_cases_from_prompt_example():
 
 
 ###################################################
-# PPO-Style clipping implementation check
+# PPO 风格裁剪实现检查
 ###################################################
 
-# See https://livebook.manning.com/forum?comment=584433 for discussion
+# 相关讨论见 https://livebook.manning.com/forum?comment=584433
 
 
 CHAPTER_CLIP_EPS = 10.0
@@ -231,7 +231,7 @@ PRACTICAL_CLIP_EPS = 0.2
 
 
 def _old_torch_where_objective(advantage, ratio, clip_eps):
-    # Previous listing 7.8 formulation
+    # 之前的代码清单 7.8 公式
     advantage = torch.tensor([advantage])
     ratio = torch.tensor([ratio])
     clipped_ratio = torch.clamp(ratio, 1.0 - clip_eps, 1.0 + clip_eps)
@@ -245,7 +245,7 @@ def _old_torch_where_objective(advantage, ratio, clip_eps):
 
 
 def _correct_torch_minimum_objective(advantage, ratio, clip_eps):
-    # Corrected listing 7.8 formulation (PPO-style clipping)
+    # 修正后的代码清单 7.8 公式（PPO 风格裁剪）
     advantage = torch.tensor([advantage])
     ratio = torch.tensor([ratio])
     clipped_ratio = torch.clamp(ratio, 1.0 - clip_eps, 1.0 + clip_eps)
@@ -255,8 +255,8 @@ def _correct_torch_minimum_objective(advantage, ratio, clip_eps):
 
 
 def test_positive_advantage_clips_ratio_above_upper_bound_in_both_versions():
-    # Positive advantages should clip ratios above
-    # the upper bound (correct in both versions)
+    # 正优势值应裁剪高于
+    # 上界的比率（两个版本都正确）
     old_where_obj = _old_torch_where_objective(1.0, 20.0, CHAPTER_CLIP_EPS)
     correct_minimum_obj = _correct_torch_minimum_objective(1.0, 20.0, CHAPTER_CLIP_EPS)
 
@@ -271,8 +271,8 @@ def test_positive_advantage_clips_ratio_above_upper_bound_in_both_versions():
 
 
 def test_positive_advantage_does_not_use_lower_clipping_bound_in_both_versions():
-    # Positive advantages should not use the lower
-    # clipping bound (correct in both versions)
+    # 正优势值不应使用
+    # 裁剪下界（两个版本都正确）
     old_where_obj = _old_torch_where_objective(1.0, 0.5, CHAPTER_CLIP_EPS)
     correct_minimum_obj = _correct_torch_minimum_objective(1.0, 0.5, CHAPTER_CLIP_EPS)
 
@@ -287,16 +287,16 @@ def test_positive_advantage_does_not_use_lower_clipping_bound_in_both_versions()
 
 
 def test_negative_advantage_lower_bound_behavior_differs_by_clip_eps():
-    # With clip_eps = 10.0, the lower bound is negative
-    # and therefore inactive for positive policy ratios
+    # 当 clip_eps = 10.0 时，下界为负数
+    # 因此对正策略比率不起作用
     old_where_obj = _old_torch_where_objective(-1.0, 0.5, CHAPTER_CLIP_EPS)
     correct_minimum_obj = _correct_torch_minimum_objective(-1.0, 0.5, CHAPTER_CLIP_EPS)
 
     assert old_where_obj.item() == pytest.approx(-0.5)
     assert correct_minimum_obj.item() == pytest.approx(-0.5)
 
-    # For a negative advantage, use the lower clipping bound
-    # (wrong in previous version)
+    # 对于负优势值，使用裁剪下界
+    # （旧版本有误）
     old_where_obj = _old_torch_where_objective(-1.0, 0.5, PRACTICAL_CLIP_EPS)
     correct_minimum_obj = _correct_torch_minimum_objective(-1.0, 0.5, PRACTICAL_CLIP_EPS)
 
@@ -305,8 +305,8 @@ def test_negative_advantage_lower_bound_behavior_differs_by_clip_eps():
 
 
 def test_negative_advantage_does_not_clip_upper_bound_in_correct_version():
-    # For a negative advantage, do not clip ratios above
-    # the upper bound (wrong in previous version)
+    # 对于负优势值，不裁剪高于
+    # 上界（旧版本有误）
     old_where_obj = _old_torch_where_objective(-1.0, 20.0, CHAPTER_CLIP_EPS)
     correct_minimum_obj = _correct_torch_minimum_objective(-1.0, 20.0, CHAPTER_CLIP_EPS)
 
@@ -321,8 +321,8 @@ def test_negative_advantage_does_not_clip_upper_bound_in_correct_version():
 
 
 def test_ratio_inside_clipping_interval_remains_unchanged_in_both_versions():
-    # Ratios inside the clipping interval should remain unchanged
-    # (correct in both versions)
+    # 裁剪区间内的比率应保持不变
+    # （两个版本都正确）
     old_where_obj = _old_torch_where_objective(-1.0, 1.0, CHAPTER_CLIP_EPS)
     correct_minimum_obj = _correct_torch_minimum_objective(-1.0, 1.0, CHAPTER_CLIP_EPS)
 
