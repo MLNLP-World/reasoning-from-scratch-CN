@@ -1,6 +1,6 @@
 # Copyright (c) Sebastian Raschka under Apache License 2.0 (see LICENSE.txt)
-# Source for "Build a Reasoning Model (From Scratch)": https://mng.bz/lZ5B
-# Code repository: https://github.com/rasbt/reasoning-from-scratch
+# 《从零构建推理模型》来源：https://mng.bz/lZ5B
+# 代码仓库：https://github.com/rasbt/reasoning-from-scratch
 
 import argparse
 import time
@@ -11,7 +11,7 @@ from reasoning_from_scratch.ch02 import get_device
 from reasoning_from_scratch.ch03 import load_model_and_tokenizer
 
 
-# Same as in main notebook
+# 与主 notebook 相同
 def format_prompt(example):
     return (
         f"{example['question']}\n"
@@ -19,7 +19,7 @@ def format_prompt(example):
         f"B. {example['choices'][1]}\n"
         f"C. {example['choices'][2]}\n"
         f"D. {example['choices'][3]}\n"
-        "Answer: "  # trailing space encourages a single-letter next token
+        "Answer: "  # 末尾空格鼓励模型生成单字母的下一词元
     )
 
 
@@ -35,7 +35,7 @@ def first_new_token_id(tokenizer, prompt, prompt_ids, continuation):
     ids_full = tokenizer.encode(prompt + continuation)
     j = common_prefix_len(ids_full, prompt_ids)
     if j >= len(ids_full):
-        raise ValueError("Continuation produced no new tokens.")
+        raise ValueError("续写未生成新词元。")
     return ids_full[j]
 
 
@@ -57,7 +57,7 @@ def evaluate_mmlu_logprobs(
     model,
     tokenizer,
     device,
-    subsets="high_school_mathematics",  # str, list of str, or "all"
+    subsets="high_school_mathematics",  # 字符串、字符串列表或 "all"
     split="test",
     verbose_every=50,
 ):
@@ -84,7 +84,7 @@ def evaluate_mmlu_logprobs(
             )
 
             ans = ex["answer"]
-            # "Gold" is the MMLU jargon for the correct answer (ground truth)
+            # “Gold”是 MMLU 中表示正确答案（真实答案）的术语
             gold = "ABCD"[ans] if isinstance(ans, int) else str(ans).strip().upper()
 
             total += 1
@@ -95,7 +95,7 @@ def evaluate_mmlu_logprobs(
 
     acc = correct / max(1, total)
     print(
-        f"\nMMLU letter accuracy (log-prob): {correct}/{total} = {acc:.2%} "
+        f"\nMMLU 字母准确率（对数概率）： {correct}/{total} = {acc:.2%} "
         f"in {time.time()-start:.1f}s"
     )
     return {"accuracy": acc, "num_examples": total, "subsets": subset_list, "split": split}
@@ -103,33 +103,33 @@ def evaluate_mmlu_logprobs(
 
 def main():
     parser = argparse.ArgumentParser(
-        description="Zero-shot MMLU evaluator via next-token log-prob scoring (A/B/C/D)."
+        formatter_class=argparse.ArgumentDefaultsHelpFormatter,
+        description="通过下一词元对数概率评分的零样本 MMLU 评估器（A/B/C/D）。"
     )
     parser.add_argument(
         "--device",
         type=str,
         default="auto",
-        help="Device to use: 'auto' (default), or any torch device string like "
-             "'cpu', 'cuda', 'cuda:0', 'mps'.",
+        help="使用的设备：'auto'，或以下 torch 设备字符串："
+             "'cpu'、'cuda'、'cuda:0'、'mps'。",
     )
     parser.add_argument(
         "--which_model",
         type=str,
         default="base",
         choices=["base", "reasoning"],
-        help="Model variant to load. Defaults to 'base'.",
+        help="要加载的模型变体",
     )
     parser.add_argument(
         "--subsets",
         type=str,
         default="high_school_mathematics",
-        help="Comma-separated subset names or 'all'. "
-             "Default: 'high_school_mathematics'.",
+        help="用逗号分隔的子集名称，或 'all'。",
     )
     args = parser.parse_args()
 
     device = get_device() if args.device == "auto" else torch.device(args.device)
-    print(f"Using device: {device}")
+    print(f"正在使用设备： {device}")
     model, tokenizer = load_model_and_tokenizer(args.which_model, device, use_compile=False)
     model.eval()
     torch.set_float32_matmul_precision("high")

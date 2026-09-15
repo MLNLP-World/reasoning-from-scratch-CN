@@ -1,6 +1,6 @@
 # Copyright (c) Sebastian Raschka under Apache License 2.0 (see LICENSE.txt)
-# Source for "Build a Reasoning Model (From Scratch)": https://mng.bz/lZ5B
-# Code repository: https://github.com/rasbt/reasoning-from-scratch
+# 《从零构建推理模型》来源：https://mng.bz/lZ5B
+# 代码仓库：https://github.com/rasbt/reasoning-from-scratch
 
 
 import argparse
@@ -20,38 +20,38 @@ from reasoning_from_scratch.qwen3 import (
 
 
 ############################
-# Parse command-line args
+# 解析命令行参数
 ############################
-parser = argparse.ArgumentParser(description="Run Qwen3 text generation")
+parser = argparse.ArgumentParser(formatter_class=argparse.ArgumentDefaultsHelpFormatter, description="运行 Qwen3 文本生成")
 parser.add_argument(
     "--device",
     type=str,
     default=None,
-    help="Device to run on (e.g. 'cpu', 'cuda', 'mps'). "
-         "If not provided, will auto-detect with get_device()."
+    help="运行设备（例如 'cpu'、'cuda'、'mps'）。"
+         "未提供时使用 get_device() 自动检测。"
 )
 parser.add_argument(
     "--cache",
     action="store_true",
-    help="Use KV cache during generation (default: False)."
+    help="生成期间使用 KV 缓存。"
 )
 
 parser.add_argument(
     "--compile",
     action="store_true",
-    help="Compile PyTorch model (default: False)."
+    help="编译 PyTorch 模型。"
 )
 
 parser.add_argument(
     "--reasoning",
     action="store_true",
-    help="Use reasoning model variant."
+    help="使用推理模型变体。"
 )
 
 parser.add_argument(
     "--optimized",
     action="store_true",
-    help="Use reasoning model variant."
+    help="使用推理模型变体。"
 )
 
 
@@ -65,17 +65,20 @@ else:
 
 if args.cache:
     if args.optimized:
-        from reasoning_from_scratch.qwen3_optimized import generate_text_basic_cache as generate_text_basic
+        from reasoning_from_scratch.qwen3_optimized import generate_text_basic_cache as generate_text
+        is_streaming_generate = False
     else:
-        from reasoning_from_scratch.ch02 import generate_text_basic_cache as generate_text_basic
+        from reasoning_from_scratch.ch02 import generate_text_basic_stream_cache as generate_text
+        is_streaming_generate = True
 
 else:
-    from reasoning_from_scratch.ch02 import generate_text_basic
+    from reasoning_from_scratch.ch02 import generate_text_basic_stream as generate_text
+    is_streaming_generate = True
 
 device = torch.device(args.device) if args.device else get_device()
 
 #########################
-# Model + tokenizer setup
+# 模型和分词器设置
 #########################
 
 if args.reasoning:
@@ -103,14 +106,14 @@ model.to(device)
 if args.compile:
     major, minor = map(int, torch.__version__.split(".")[:2])
     if (major, minor) >= (2, 8):
-        # This avoids retriggering model recompilations
-        # in PyTorch 2.8 and newer
-        # if the model contains code like self.pos = self.pos + 1
+        # 这可以避免再次触发模型重新编译
+        # 适用于 PyTorch 2.8 及更高版本
+        # 当模型包含 self.pos = self.pos + 1 之类代码时
         torch._dynamo.config.allow_unspec_int_on_nn_module = True
     model = torch.compile(model)
 
 #########################
-# Prompt + generation
+# 提示词和生成
 #########################
 
 if args.reasoning:
@@ -128,8 +131,8 @@ max_new_tokens = 2048
 
 for iteration in range(1, 4):
     print("=" * 60)
-    print(f"Iteration : {iteration}")
-    print(f"optimized : {args.optimized}")
+    print(f"迭代次数： {iteration}")
+    print(f"优化版本： {args.optimized}")
     print(f"torch     : {torch.__version__}")
     print(f"device    : {device}")
     print(f"cache     : {args.cache}")
@@ -138,13 +141,24 @@ for iteration in range(1, 4):
     print("=" * 60)
 
     start_time = time.time()
-    output_token_ids_tensor = generate_text_basic(
-        model=model,
-        token_ids=input_token_ids_tensor,
-        max_new_tokens=max_new_tokens,
-        eos_token_id=tokenizer.eos_token_id,
-    )
+    if is_streaming_generate:
+        generated_ids = []
+        for token in generate_text(
+            model=model,
+            token_ids=input_token_ids_tensor,
+            max_new_tokens=max_new_tokens,
+            eos_token_id=tokenizer.eos_token_id,
+        ):
+            generated_ids.append(token.squeeze(0).item())
+        output_token_ids_tensor = torch.tensor(generated_ids, device=device)
+    else:
+        output_token_ids_tensor = generate_text(
+            model=model,
+            token_ids=input_token_ids_tensor,
+            max_new_tokens=max_new_tokens,
+            eos_token_id=tokenizer.eos_token_id,
+        )
     end_time = time.time()
 
-    print(f"Output length: {output_token_ids_tensor.numel()}")
+    print(f"输出长度： {output_token_ids_tensor.numel()}")
     generate_stats(output_token_ids_tensor, tokenizer, start_time, end_time)

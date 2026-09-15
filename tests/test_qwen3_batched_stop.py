@@ -1,6 +1,6 @@
 # Copyright (c) Sebastian Raschka under Apache License 2.0 (see LICENSE.txt)
-# Source for "Build a Reasoning Model (From Scratch)": https://mng.bz/lZ5B
-# Code repository: https://github.com/rasbt/reasoning-from-scratch
+# 《从零构建推理模型》来源：https://mng.bz/lZ5B
+# 代码仓库：https://github.com/rasbt/reasoning-from-scratch
 
 import os
 import torch
@@ -23,7 +23,7 @@ from reasoning_from_scratch.qwen3_batched import (
 
 skip_expensive = os.environ.get("SKIP_EXPENSIVE", "0") == "1"
 
-# Make CI more reproducible & robust
+# 提高 CI 的可复现性和稳健性
 os.environ["MKL_NUM_THREADS"] = "1"
 os.environ["OMP_NUM_THREADS"] = "1"
 torch.backends.mkldnn.enabled = False
@@ -37,7 +37,7 @@ def test_batched_vs_batched_stop_equivalence(reasoning):
 
     device = get_device()
 
-    # Download and init tokenizer
+    # 下载并初始化分词器
     kind = "reasoning" if reasoning else "base"
     download_qwen3_small(kind=kind, tokenizer_only=False, out_dir="qwen3")
     tokenizer_path = Path("qwen3") / (
@@ -53,19 +53,19 @@ def test_batched_vs_batched_stop_equivalence(reasoning):
         add_thinking=reasoning,
     )
 
-    # Model
+    # 模型
     model_batched = Qwen3ModelBatched(QWEN_CONFIG_06_B)
     model_batched.load_state_dict(torch.load(model_path, map_location=device))
     model_batched.to(device).eval()
 
-    # Prompts
+    # 提示词
     prompts = [
         "Explain large language models in two sentences.",
         "Explain large language models in one sentence.",
         "1+1?",
     ]
 
-    # Batched inputs (left-padded)
+    # 批处理输入（左侧填充）
     tokenized = [tokenizer.encode(p) for p in prompts]
     max_len = max(len(t) for t in tokenized)
     pad_id = tokenizer.pad_token_id
@@ -76,7 +76,7 @@ def test_batched_vs_batched_stop_equivalence(reasoning):
     input_ids_batched = torch.tensor(left_padded, device=device)
     attn_mask_batched = torch.tensor(attn_mask, device=device, dtype=torch.bool)
 
-    # Generation
+    # 生成
     max_new_tokens = 12
     outputs_reg = generate_text_basic_batched_cache(
         model=model_batched,
@@ -95,7 +95,7 @@ def test_batched_vs_batched_stop_equivalence(reasoning):
         pad_id=pad_id,
     )
 
-    # Check equivalency
+    # 检查等价性
     for idx in range(len(prompts)):
         reg_toks = outputs_reg[idx].tolist()
         stop_toks = outputs_stop[idx].tolist()
@@ -114,7 +114,7 @@ def test_stream_vs_stream_stop_equivalence(reasoning):
 
     device = get_device()
 
-    # Download and init tokenizer
+    # 下载并初始化分词器
     kind = "reasoning" if reasoning else "base"
     download_qwen3_small(kind=kind, tokenizer_only=False, out_dir="qwen3")
     tokenizer_path = Path("qwen3") / (
@@ -130,19 +130,19 @@ def test_stream_vs_stream_stop_equivalence(reasoning):
         add_thinking=reasoning,
     )
 
-    # Model
+    # 模型
     model_batched = Qwen3ModelBatched(QWEN_CONFIG_06_B)
     model_batched.load_state_dict(torch.load(model_path, map_location=device))
     model_batched.to(device).eval()
 
-    # Prompts
+    # 提示词
     prompts = [
         "Explain large language models in two sentences.",
         "Explain large language models in one sentence.",
         "1+1?",
     ]
 
-    # Batched inputs (left-padded)
+    # 批处理输入（左侧填充）
     tokenized = [tokenizer.encode(p) for p in prompts]
     max_len = max(len(t) for t in tokenized)
     pad_id = tokenizer.pad_token_id
@@ -153,11 +153,11 @@ def test_stream_vs_stream_stop_equivalence(reasoning):
     input_ids_batched = torch.tensor(left_padded, device=device)
     attn_mask_batched = torch.tensor(attn_mask, device=device, dtype=torch.bool)
 
-    # Generation
+    # 生成
     max_new_tokens = 12
     B = input_ids_batched.size(0)
 
-    # Regular streaming
+    # 常规流式生成
     reg_stream_tokens = [[] for _ in range(B)]
     for step_tokens in generate_text_basic_batched_stream_cache(
         model=model_batched,
@@ -171,7 +171,7 @@ def test_stream_vs_stream_stop_equivalence(reasoning):
         for b in range(B):
             reg_stream_tokens[b].append(int(step_tokens[b].item()))
 
-    # Stop streaming
+    # 停止流式生成
     stop_stream_tokens = [[] for _ in range(B)]
     for step_tokens in generate_text_basic_batched_stream_cache_stop(
         model=model_batched,
@@ -185,7 +185,7 @@ def test_stream_vs_stream_stop_equivalence(reasoning):
         for b in range(B):
             stop_stream_tokens[b].append(int(step_tokens[b].item()))
 
-    # Check equivalency
+    # 检查等价性
     for idx in range(B):
         assert reg_stream_tokens[idx] == stop_stream_tokens[idx], (
             f"Token mismatch at prompt {idx}:\n"

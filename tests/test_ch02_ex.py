@@ -1,6 +1,6 @@
 # Copyright (c) Sebastian Raschka under Apache License 2.0 (see LICENSE.txt)
-# Source for "Build a Reasoning Model (From Scratch)": https://mng.bz/lZ5B
-# Code repository: https://github.com/rasbt/reasoning-from-scratch
+# 《从零构建推理模型》来源：https://mng.bz/lZ5B
+# 代码仓库：https://github.com/rasbt/reasoning-from-scratch
 
 import torch
 
@@ -14,7 +14,7 @@ from reasoning_from_scratch.ch02_ex import (
 )
 
 
-# Dummy model for generate_text_basic tests.
+# 用于 generate_text_basic 测试的虚拟模型。
 class DummyModel:
     def __init__(self, fixed_token, vocab_size=5):
         self.fixed_token = fixed_token
@@ -28,7 +28,7 @@ class DummyModel:
     def __call__(self, token_ids, cache=None):
         batch_size, seq_len = token_ids.size()
         out = torch.zeros(batch_size, seq_len, self.vocab_size)
-        # Set the fixed_token column to the highest value so argmax returns fixed_token
+        # 将 fixed_token 列设为最大值，使 argmax 返回 fixed_token
         out[..., self.fixed_token] = 1.0
         return out
 
@@ -53,9 +53,9 @@ def test_generate_text_basic_stream_equivalence():
     fixed_token = 2
 
     dummy_model = DummyModel(fixed_token=fixed_token)
-    token_ids = torch.tensor([[1, 3, 4]])  # shape (batch, seq_len)
+    token_ids = torch.tensor([[1, 3, 4]])  # 形状（批量, 序列长度）
 
-    # Set eos_token_id to be the fixed_token so that generation stops immediately
+    # 将 eos_token_id 设为 fixed_token，使生成立即停止
     output_1 = generate_text_basic(dummy_model, token_ids, max_new_tokens, eos_token_id=fixed_token)
     output_1 = output_1.squeeze(0).tolist()
 
@@ -97,9 +97,9 @@ def test_generate_text_basic_cache_stream_equivalence():
     fixed_token = 2
 
     dummy_model = DummyModelCache(fixed_token=fixed_token)
-    token_ids = torch.tensor([[1, 3, 4]])  # shape (batch, seq_len)
+    token_ids = torch.tensor([[1, 3, 4]])  # 形状（批量, 序列长度）
 
-    # Set eos_token_id to be the fixed_token so that generation stops immediately
+    # 将 eos_token_id 设为 fixed_token，使生成立即停止
     output_1 = generate_text_basic(dummy_model, token_ids, max_new_tokens, eos_token_id=fixed_token)
     output_1 = output_1.squeeze(0).tolist()
 

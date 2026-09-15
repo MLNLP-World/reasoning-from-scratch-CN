@@ -13,7 +13,7 @@
 
 如果你已经安装了较新的Python版本，可以直接用内置的`pip`来安装包。
 
-本书示例使用Python 3.12，但3.11或3.10也能正常运行。可通过以下命令检查当前版本：
+本书使用 Python 3.12。不过，只要 PyTorch 支持，较新的 Python 3.13、3.14 以及较旧的 3.11、3.10 也能正常工作。可以通过以下命令检查 Python 版本：
 
 ```bash
 python --version
@@ -88,9 +88,16 @@ git clone https://github.com/rasbt/reasoning-from-scratch.git
 cd reasoning-from-scratch
 ```
 
-由于目录中带有 `pyproject.toml`，当你首次运行脚本或打开Jupyter Lab时，`uv` 会自动为该项目创建一个（默认隐藏的）虚拟环境文件夹 `.venv`，并安装所有依赖。
+由于该文件夹包含 `pyproject.toml` 和 `.python-version` 文件，因此可以直接使用：首次运行脚本或打开 Jupyter Lab 时，`uv` 会自动为 `reasoning-from-scratch` 项目创建一个默认隐藏的虚拟环境文件夹（`.venv`），并在其中安装全部依赖。
 
-若需要安装 `pyproject.toml` 中未列出的额外包，可使用 `uv add`：
+`.python-version` 文件目前将本地 `uv` 环境固定为 Python 3.13，以避免意外选择比本项目测试过的 PyTorch 版本更新的 Python。如果 `uv` 使用了其他 Python 版本，可以运行以下命令重置本地固定版本：
+
+```bash
+uv python pin 3.13
+uv sync
+```
+
+通常不需要额外安装软件包；但一般来说，可以通过 `uv add` 安装 `pyproject.toml` 中尚未列出的额外包：
 
 ```bash
 uv add llms_from_scratch
@@ -105,7 +112,7 @@ uv add llms_from_scratch
 
 打开Jupyter Lab：
 
-```python
+```bash
 uv run jupyter lab
 ```
 
@@ -119,6 +126,17 @@ uv run python script.py
 > 如果你使用macOS或Linux并偏好`uv`原生命令，请参考[该教程](https://github.com/rasbt/LLMs-from-scratch/blob/main/setup/01_optional-python-setup-preferences/native-uv.md)。同时建议查阅[官方uv文档](https://docs.astral.sh/uv/)以获取更多信息。
 
 
+
+&nbsp;
+### JupyterLab 使用提示
+
+如果在 JupyterLab 而不是 VSCode 中查看 notebook 代码，请注意，JupyterLab 的默认设置在近期版本中出现过滚动问题。建议打开 Settings -> Settings Editor，将“Windowing mode”改为“none”（如下图所示），这似乎可以解决该问题。
+
+![Jupyter 问题 1](https://sebastianraschka.com/images/reasoning-from-scratch-images/bonus/setup/jupyter_glitching_1.webp)
+
+<br>
+
+![Jupyter 问题 2](https://sebastianraschka.com/images/reasoning-from-scratch-images/bonus/setup/jupyter_glitching_2.webp)
 
 &nbsp;
 ## 有问题？

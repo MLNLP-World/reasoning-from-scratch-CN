@@ -1,6 +1,6 @@
 # Copyright (c) Sebastian Raschka under Apache License 2.0 (see LICENSE.txt)
-# Source for "Build a Reasoning Model (From Scratch)": https://mng.bz/lZ5B
-# Code repository: https://github.com/rasbt/reasoning-from-scratch
+# 《从零构建推理模型》来源：https://mng.bz/lZ5B
+# 代码仓库：https://github.com/rasbt/reasoning-from-scratch
 
 import argparse
 import random
@@ -10,7 +10,7 @@ from collections import Counter
 from datasets import load_dataset
 
 
-# Gold letter is MMLU jargon for correct answer letter
+# Gold letter 是 MMLU 中表示正确答案字母的术语
 def gold_letter(ans):
     if isinstance(ans, int):
         return "ABCD"[ans]
@@ -20,25 +20,26 @@ def gold_letter(ans):
 
 def main():
     parser = argparse.ArgumentParser(
-        description="Show gold answer distribution for an MMLU subset and a random-guess baseline."
+        formatter_class=argparse.ArgumentDefaultsHelpFormatter,
+        description="显示 MMLU 子集的真实答案分布和随机猜测基线。"
     )
     parser.add_argument(
         "--subset",
         type=str,
         default="high_school_mathematics",
-        help="MMLU subset name (default: 'high_school_mathematics').",
+        help="MMLU 子集名称。",
     )
     parser.add_argument(
         "--seed",
         type=int,
         default=42,
-        help="Random seed for the random-guess baseline (default: 42).",
+        help="随机猜测基线的随机种子。",
     )
     parser.add_argument(
         "--trials",
         type=int,
         default=10_000,
-        help="Number of random-guess trials (default: 10,000).",
+        help="随机猜测试验次数。",
     )
     args = parser.parse_args()
 
@@ -49,17 +50,17 @@ def main():
     counts = Counter(labels)
 
     print(f"Subset: {args.subset} | split: test | n={n}")
-    print("Gold distribution provided in the dataset:")
+    print("数据集中提供的真实答案分布：")
     for letter in "ABCD":
         c = counts.get(letter, 0)
         pct = (c / n) if n else 0.0
         print(f"  {letter}: {c} ({pct:.2%})")
 
     if n == 0:
-        print("\nNo items. Baseline undefined.")
+        print("\n没有样本，无法定义基线。")
         return
 
-    # Repeat random guessing
+    # 重复随机猜测
     rng = random.Random(args.seed)
     accs = []
     for _ in range(args.trials):
@@ -70,21 +71,21 @@ def main():
     mean_acc = stats.mean(accs)
     sd_acc = stats.stdev(accs) if len(accs) > 1 else 0.0
 
-    print(f"\nRandom guessing over {args.trials:,} trials (uniform A/B/C/D, seed={args.seed}):")
-    print(f"  Mean accuracy: {mean_acc:.2%}")
-    print(f"  Std dev across trials: {sd_acc:.2%}")
+    print(f"\n随机猜测试验次数： {args.trials:,} trials (uniform A/B/C/D, seed={args.seed}):")
+    print(f"  平均准确率： {mean_acc:.2%}")
+    print(f"  各次试验的标准差： {sd_acc:.2%}")
 
-    # Quantiles
+    # 分位数
     qs = [0.01, 0.05, 0.25, 0.5, 0.75, 0.95, 0.99]
     accs_sorted = sorted(accs)
-    print("\nSelected quantiles of accuracy:")
+    print("\n选定的准确率分位数：")
     for q in qs:
         idx = int(q * len(accs_sorted))
         print(f"  {q:.0%} quantile: {accs_sorted[idx]:.3%}")
 
-    # Frequency table (rounded)
+    # 频数表（四舍五入）
     acc_counts = Counter(round(a, 2) for a in accs)
-    print("\nFull frequency table of accuracies (rounded):")
+    print("\n完整的准确率频数表（四舍五入）：")
     for acc_val in sorted(acc_counts):
         freq = acc_counts[acc_val]
         pct = freq / args.trials

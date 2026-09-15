@@ -1,6 +1,9 @@
 # Copyright (c) Sebastian Raschka under Apache License 2.0 (see LICENSE.txt)
-# Source for "Build a Reasoning Model (From Scratch)": https://mng.bz/lZ5B
-# Code repository: https://github.com/rasbt/reasoning-from-scratch
+# 《从零构建推理模型》来源：https://mng.bz/lZ5B
+# 代码仓库：https://github.com/rasbt/reasoning-from-scratch
+
+[tool.setuptools.dynamic]
+version = { attr = "reasoning_from_scratch.__version__" }
 
 [build-system]
 requires = ["setuptools>=61.0", "wheel"]
@@ -8,9 +11,8 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "reasoning_from_scratch"
-
-version = "0.1.10"
-description = "Reasoning Models From Scratch"
+dynamic = ["version"]
+description = "从零构建推理模型"
 readme = "README.md"
 
 authors = [
@@ -18,14 +20,15 @@ authors = [
 ]
 
 license = { file = "LICENSE" }
-requires-python = ">=3.10"
+requires-python = ">=3.10,<3.15"
 
 dependencies = [
     "jupyterlab>=4.4.7",
-    "torch>=2.7.1",
+    "torch>=2.7.1,<2.11",
     "tokenizers>=0.21.2",
     "nbformat>=5.10.4",
-    "sympy>=1.14.0", # For verifier in ch03
+    "setuptools>=61.0",
+    "sympy>=1.14.0", # 用于第 3 章验证器
     "matplotlib>=3.10.7",
 ]
 
@@ -35,6 +38,7 @@ classifiers = [
   "Programming Language :: Python :: 3.11",
   "Programming Language :: Python :: 3.12",
   "Programming Language :: Python :: 3.13",
+  "Programming Language :: Python :: 3.14",
   "Intended Audience :: Developers",
   "Operating System :: OS Independent"
 ]
@@ -44,20 +48,25 @@ dev = [
     "pytest>=8.3.5",
     "ruff>=0.4.4",
     "pytest-ruff>=0.5",
-    "transformers==4.53.0",
-    "reasoning-from-scratch",
+    "huggingface-hub>=1.0",
+    "safetensors>=0.7",
+    "transformers>=4.53.0",
     "twine>=6.1.0",
     "build>=1.2.2.post1",
 ]
 
+[project.optional-dependencies]
 extra = [
-    "datasets>=4.1.1",  # Appendix F, MMLU
-    "chainlit>=2.8.3",  # Appendix G, Chat UI
+    "datasets>=4.1.1",  # 附录 F：MMLU
+    "chainlit>=2.8.3",  # 附录 G：聊天界面
 ]
 
 [tool.setuptools.packages.find]
 where = ["."]
-include = ["reasoning_from_scratch"]
+include = ["reasoning_from_scratch", "reasoning_from_scratch.*"]
+
+[tool.uv]
+exclude-newer = "7 days"  # 需要较新的 uv；如果解析失败，请运行 `uv self update`
 
 [tool.uv.sources]
 reasoning = { workspace = true }

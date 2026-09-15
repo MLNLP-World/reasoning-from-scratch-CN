@@ -1,18 +1,18 @@
 # Copyright (c) Sebastian Raschka under Apache License 2.0 (see LICENSE.txt)
-# Source for "Build a Reasoning Model (From Scratch)": https://mng.bz/lZ5B
-# Code repository: https://github.com/rasbt/reasoning-from-scratch
+# 《从零构建推理模型》来源：https://mng.bz/lZ5B
+# 代码仓库：https://github.com/rasbt/reasoning-from-scratch
 
 import argparse
 import json
 from pathlib import Path
 import time
-import requests
 
 import torch
 from collections import Counter
 
 from reasoning_from_scratch.ch02 import get_device
 from reasoning_from_scratch.ch03 import (
+    load_math500_test,
     eta_progress_message,
     render_prompt,
     grade_answer,
@@ -37,7 +37,7 @@ def self_consistency_vote(
     show_progress=True,
     show_long_answer=False,
     seed=None,
-    early_stop=True,   # NEW
+    early_stop=True,   # 新增
 ):
     full_answers, short_answers = [], []
     counts = Counter()
@@ -70,8 +70,8 @@ def self_consistency_vote(
             print(f"[Sample {i+1}/{num_samples}] → {short!r}")
 
         #########################################################
-        # NEW
-        # Early stop if one answer already meets >= 50% majority
+        # 新增
+        # 如果某个答案已达到不低于 50% 的多数票，则提前停止
         if early_stop and counts[short] > num_samples / 2:
             majority_winners = [short]
             final_answer = short
@@ -103,12 +103,12 @@ def evaluate_math500_stream(
     out_path=None,
     max_new_tokens=2048,
     verbose=False,
-    prompt_suffix="",    # NEW
-    temperature=1.0,     # NEW
-    top_p=1.0,           # NEW
-    seed=None,           # NEW
-    num_samples=10,      # NEW
-    early_stop=False,    # NEW
+    prompt_suffix="",    # 新增
+    temperature=1.0,     # 新增
+    top_p=1.0,           # 新增
+    seed=None,           # 新增
+    num_samples=10,      # 新增
+    early_stop=False,    # 新增
 ):
 
     if out_path is None:
@@ -124,7 +124,7 @@ def evaluate_math500_stream(
             prompt = render_prompt(row["problem"])
 
             ###################################################################
-            # NEW
+            # 新增
             prompt += prompt_suffix
             results = self_consistency_vote(
                 model=model,
@@ -141,8 +141,8 @@ def evaluate_math500_stream(
                 early_stop=early_stop,
             )
 
-            # If final_answer was not determined (tie),
-            # resolve it by first appearance
+            # 如果尚未确定 final_answer（平票），
+            # 按首次出现顺序解决平票
             if results["final_answer"] is None:
                 extracted = results["majority_winners"][0]
             else:
@@ -152,7 +152,7 @@ def evaluate_math500_stream(
             #     gen_text
             # )
 
-            # Optionally, get long answer
+            # 可选：获取长答案
             if extracted is not None:
                 for idx, s in enumerate(results["short_answers"]):
                     if s == extracted:
@@ -189,106 +189,88 @@ def evaluate_math500_stream(
                     f"\n\n{'='*50}\n{progress_msg}\n"
                     f"{'='*50}\nExtracted: {extracted}\n"
                     f"Expected:  {row['answer']}\n"
-                    f"Correct so far: {num_correct}\n{'-'*50}"
+                    f"当前正确数： {num_correct}\n{'-'*50}"
                 )
 
     seconds_elapsed = time.time() - start_time
     acc = num_correct / num_examples if num_examples else 0.0
     print(f"\nAccuracy: {acc*100:.1f}% ({num_correct}/{num_examples})")
-    print(f"Total time: {seconds_elapsed/60:.1f} min")
-    print(f"Logs written to: {out_path}")
+    print(f"总耗时： {seconds_elapsed/60:.1f} min")
+    print(f"日志已写入： {out_path}")
     return num_correct, num_examples, acc
 
 
-def get_data():
-    local_path = Path("math500_test.json")
-    url = (
-        "https://raw.githubusercontent.com/rasbt/reasoning-from-scratch/"
-        "main/ch03/01_main-chapter-code/math500_test.json"
-    )
-
-    if local_path.exists():
-        with local_path.open("r", encoding="utf-8") as f:
-            math_data = json.load(f)
-    else:
-        r = requests.get(url, timeout=30)
-        r.raise_for_status()
-        math_data = r.json()
-
-    return math_data
-
-
 def parse_args():
-    parser = argparse.ArgumentParser()
+    parser = argparse.ArgumentParser(formatter_class=argparse.ArgumentDefaultsHelpFormatter)
     parser.add_argument(
         "--device",
         type=str,
         default="auto",
-        help="Device to use: 'auto' (default), or any torch device string like 'cpu', 'cuda', 'cuda:0', 'mps'.",
+        help="使用的设备：'auto'，或 'cpu'、'cuda'、'cuda:0'、'mps' 等 torch 设备字符串。",
     )
     parser.add_argument(
         "--which_model",
         type=str,
         default="base",
         choices=["base", "reasoning", "instruct"],
-        help="Model variant to load. Defaults to 'base'.",
+        help="要加载的模型变体",
     )
     parser.add_argument(
         "--dataset_size",
         type=int,
         default=10,
-        help="Number of MATH-500 examples to evaluate. Default: 10",
+        help="要评估的 MATH-500 样本数",
     )
     parser.add_argument(
         "--max_new_tokens",
         type=int,
         default=2048,
-        help="Max new tokens for generation. Default: 2048",
+        help="生成的最大新词元数",
     )
     parser.add_argument(
         "--compile",
         action="store_true",
-        help="Enable torch.compile for the model.",
+        help="为模型启用 torch.compile。",
     )
     parser.add_argument(
         "--verbose",
         action="store_true",
-        help="Print per-sample correctness while evaluating.",
+        help="评估时输出每个样本是否正确。",
     )
     parser.add_argument(
         "--prompt_suffix",
         type=str,
-        default="/n/nExplain step by step.",
-        help="Adds a chain-of-thought prompt (default: '/n/nExplain step by step.')",
+        default="\n\nExplain step by step.",
+        help="添加思维链提示词",
     )
     parser.add_argument(
         "--seed",
         type=int,
         default=42,
-        help="Random seed for self-consistency sampling",
+        help="自洽采样的随机种子",
     )
     parser.add_argument(
         "--temperature",
         type=float,
         default=1.0,
-        help="Setting for temperature scaling",
+        help="温度缩放设置",
     )
     parser.add_argument(
         "--top_p",
         type=float,
         default=1.0,
-        help="Threshold for top-p filtering (nucleus sampling)",
+        help="top-p 过滤（核采样）的阈值",
     )
     parser.add_argument(
         "--num_samples",
         type=int,
         default=3,
-        help="Number of samples for self-consistency sampling",
+        help="自洽采样的样本数",
     )
     parser.add_argument(
         "--early_stop",
         action="store_true",
-        help="Enable early stopping when a strict majority is reached",
+        help="达到严格多数票时启用提前停止",
     )
     return parser.parse_args()
 
@@ -310,7 +292,7 @@ if __name__ == "__main__":
     print("Device:", device)
     dev_name = str(device).replace(":", "-")
 
-    math_data = get_data()
+    math_data = load_math500_test()
 
     if args.which_model == "instruct":
         which_model = "reasoning"
@@ -336,10 +318,10 @@ if __name__ == "__main__":
         math_data=math_data[:dataset_size],
         max_new_tokens=max_new_tokens,
         verbose=args.verbose,
-        prompt_suffix=args.prompt_suffix,  # NEW
-        temperature=args.temperature,      # NEW
-        top_p=args.top_p,                  # NEW
-        seed=args.seed,                    # NEW
-        num_samples=args.num_samples,      # NEW
-        early_stop=args.early_stop         # NEW
+        prompt_suffix=args.prompt_suffix,  # 新增
+        temperature=args.temperature,      # 新增
+        top_p=args.top_p,                  # 新增
+        seed=args.seed,                    # 新增
+        num_samples=args.num_samples,      # 新增
+        early_stop=args.early_stop         # 新增
     )

@@ -1,6 +1,9 @@
 # Copyright (c) Sebastian Raschka under Apache License 2.0 (see LICENSE.txt)
-# Source for "Build a Reasoning Model (From Scratch)": https://mng.bz/lZ5B
-# Code repository: https://github.com/rasbt/reasoning-from-scratch
+# 《从零构建推理模型》来源：https://mng.bz/lZ5B
+# 代码仓库：https://github.com/rasbt/reasoning-from-scratch
+
+import reasoning_from_scratch.qwen3 as qwen3_mod
+import reasoning_from_scratch.utils as utils_mod
 
 from reasoning_from_scratch.qwen3 import (
     compute_rope_params,
@@ -9,7 +12,9 @@ from reasoning_from_scratch.qwen3 import (
     RMSNorm,
     Qwen3Model,
     Qwen3Tokenizer,
-    load_hf_weights_into_qwen
+    load_hf_weights_into_qwen,
+    download_qwen3_grpo_checkpoints,
+    download_qwen3_distill_checkpoints,
 )
 from reasoning_from_scratch.ch02 import (
     generate_text_basic,
@@ -20,6 +25,7 @@ from reasoning_from_scratch.utils import download_file
 import importlib
 import os
 import platform
+import requests
 import shutil
 import tempfile
 import pytest
@@ -27,7 +33,7 @@ import torch
 import torch.nn as nn
 
 
-# Make CI more reproducible & robust
+# 提高 CI 的可复现性和稳健性
 os.environ["MKL_NUM_THREADS"] = "1"
 os.environ["OMP_NUM_THREADS"] = "1"
 torch.backends.mkldnn.enabled = False
@@ -51,14 +57,32 @@ class Qwen3RMSNorm(nn.Module):
         hidden_states = hidden_states.to(torch.float32)
         variance = hidden_states.pow(2).mean(-1, keepdim=True)
         hidden_states = hidden_states * torch.rsqrt(variance + self.variance_epsilon)
-        print(input_dtype)
         return self.weight * hidden_states.to(input_dtype)
 
     def extra_repr(self):
         return f"{tuple(self.weight.shape)}, eps={self.variance_epsilon}"
 
 
+class DummyDownloadResponse:
+    def __init__(self, size):
+        self.headers = {"Content-Length": str(size)}
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, exc_type, exc, tb):
+        return False
+
+    def raise_for_status(self):
+        return None
+
+    def iter_content(self, chunk_size):
+        yield b"unused"
+
+
 transformers_installed = importlib.util.find_spec("transformers") is not None
+run_real_download = os.environ.get("RUN_REAL_DOWNLOAD_TESTS", "0") == "1"
+skip_expensive = os.environ.get("SKIP_EXPENSIVE", "0") == "1"
 
 
 @pytest.mark.skipif(not transformers_installed, reason="transformers not installed")
@@ -66,35 +90,35 @@ def test_rope():
 
     from transformers.models.qwen3.modeling_qwen3 import Qwen3RotaryEmbedding, apply_rotary_pos_emb
 
-    # Settings
+    # 设置
     batch_size = 1
     context_len = 8192
     num_heads = 4
     head_dim = 16
     rope_theta = 1_000_000
 
-    # Instantiate RoPE parameters
+    # 实例化 RoPE 参数
     cos, sin = compute_rope_params(
         head_dim=head_dim,
         theta_base=rope_theta,
         context_length=context_len,
     )
 
-    # Dummy query and key tensors
+    # 虚拟查询和键张量
     torch.manual_seed(123)
     queries = torch.randn(batch_size, num_heads, context_len, head_dim)
     keys = torch.randn(batch_size, num_heads, context_len, head_dim)
 
-    # Apply rotary position embeddings
+    # 应用旋转位置嵌入
     queries_rot = apply_rope(queries, cos, sin)
     keys_rot = apply_rope(keys, cos, sin)
 
-    # Generate reference RoPE via HF
+    # 通过 HF 生成参考 RoPE
     class RoPEConfig:
-        rope_type = "qwen3"
         factor = 1.0
         dim: int = head_dim
         rope_theta = 1_000_000
+        rope_parameters = {"rope_type": "default", "rope_theta": rope_theta}
         max_position_embeddings: int = 8192
         hidden_size = head_dim * num_heads
         num_attention_heads = num_heads
@@ -122,7 +146,7 @@ def test_rmsnorm_equivalence():
     rms_norm = RMSNorm(hidden_size)
     ref_norm = Qwen3RMSNorm(hidden_size)
 
-    # Sync weights
+    # 同步权重
     with torch.no_grad():
         ref_norm.weight.copy_(ref_norm.weight)
 
@@ -134,8 +158,11 @@ def test_rmsnorm_equivalence():
     torch.testing.assert_close(out1, out2, atol=1e-5, rtol=1e-5)
 
 
-@pytest.mark.skipif(not transformers_installed, reason="transformers not installed")
-def test_tokenizer_equivalence():
+@pytest.mark.skipif(
+    skip_expensive or not run_real_download or not transformers_installed,
+    reason="Set RUN_REAL_DOWNLOAD_TESTS=1 and unset SKIP_EXPENSIVE to run real download tests",
+)
+def test_tokenizer_equivalence_real_download():
     from transformers import AutoTokenizer
 
     prompt = "Give me a short introduction to large language models."
@@ -180,6 +207,7 @@ def test_tokenizer_equivalence():
                         tokenize=True,
                         add_generation_prompt=states[0],
                         enable_thinking=states[1],
+                        return_dict=False,
                     )
                 else:
                     input_token_ids_ref = input_token_ids
@@ -197,6 +225,123 @@ def test_tokenizer_equivalence():
                 expected_pad_token = "<|endoftext|>"
                 assert tokenizer.decode([tokenizer.eos_token_id]) == expected_eos_token
                 assert tokenizer.decode([tokenizer.pad_token_id]) == expected_pad_token
+
+
+def test_download_qwen3_grpo_checkpoints_legacy_no_kl(monkeypatch):
+    calls = []
+
+    def fake_download_file(url, out_dir=".", backup_url=None):
+        calls.append((url, out_dir, backup_url))
+        return "downloaded-path"
+
+    monkeypatch.setattr(qwen3_mod, "download_file", fake_download_file)
+
+    path = download_qwen3_grpo_checkpoints(grpo_type="no_kl", step="00050", out_dir="qwen3")
+    assert path == "downloaded-path"
+    assert calls == [(
+        "https://huggingface.co/rasbt/qwen3-from-scratch-grpo-checkpoints/resolve/main/"
+        "grpo_original_no_kl/qwen3-0.6B-rlvr-grpo-step00050.pth",
+        "qwen3",
+        "https://f001.backblazeb2.com/file/reasoning-from-scratch/qwen3-0.6B-checkpoints/"
+        "grpo_original_no_kl/qwen3-0.6B-rlvr-grpo-step00050.pth",
+    )]
+
+
+def test_download_qwen3_grpo_checkpoints_chapter_7(monkeypatch):
+    calls = []
+
+    def fake_download_file(url, out_dir=".", backup_url=None):
+        calls.append((url, out_dir, backup_url))
+        return "downloaded-path"
+
+    monkeypatch.setattr(qwen3_mod, "download_file", fake_download_file)
+
+    path = download_qwen3_grpo_checkpoints(
+        grpo_type="clip_ratio",
+        step=150,
+        out_dir="qwen3",
+    )
+
+    assert path == "downloaded-path"
+    assert calls == [(
+        "https://huggingface.co/rasbt/qwen3-from-scratch-grpo-checkpoints/resolve/main/"
+        "7_4_plus_clip_ratio/checkpoints/qwen3-0.6B-rlvr-grpo-step00150.pth",
+        "qwen3",
+        None,
+    )]
+
+
+def test_download_qwen3_distill_checkpoints(monkeypatch):
+    calls = []
+
+    def fake_download_file(url, out_dir=".", backup_url=None):
+        calls.append((url, out_dir, backup_url))
+        return "downloaded-path"
+
+    monkeypatch.setattr(qwen3_mod, "download_file", fake_download_file)
+
+    path = download_qwen3_distill_checkpoints(
+        distill_type="deepseek_r1",
+        step="13364",
+        out_dir="qwen3",
+    )
+
+    assert path == "downloaded-path"
+    assert calls == [(
+        "https://huggingface.co/rasbt/qwen3-from-scratch-distill-checkpoints/resolve/main/"
+        "ch08_distill_deepseek_r1/checkpoints/qwen3-0.6B-distill-step13364-epoch2.pth",
+        "qwen3",
+        None,
+    )]
+
+
+def test_download_file_error_message_points_to_troubleshooting(tmp_path, monkeypatch):
+    calls = []
+
+    def fake_get(url, stream=True, timeout=30):
+        calls.append(url)
+        raise requests.exceptions.SSLError("CERTIFICATE_VERIFY_FAILED")
+
+    monkeypatch.setattr(utils_mod.requests, "get", fake_get)
+
+    with pytest.raises(RuntimeError) as excinfo:
+        download_file(
+            "https://primary.example.com/qwen3-0.6B-base.pth",
+            out_dir=tmp_path,
+            backup_url="https://backup.example.com/qwen3-0.6B-base.pth",
+        )
+
+    message = str(excinfo.value)
+    assert "Primary URL failed" in message
+    assert "Backup URL failed" in message
+    assert "CERTIFICATE_VERIFY_FAILED" in message
+    assert "https://github.com/rasbt/reasoning-from-scratch/blob/main/troubleshooting.md" in message
+    assert "VPN, proxy, or antivirus" in message
+    assert calls == [
+        "https://primary.example.com/qwen3-0.6B-base.pth",
+        "https://backup.example.com/qwen3-0.6B-base.pth",
+    ]
+
+
+def test_download_file_cached_file_returns_existing_path(tmp_path, monkeypatch):
+    calls = []
+    existing = tmp_path / "tokenizer-base.json"
+    existing.write_bytes(b"1234")
+
+    def fake_get(url, stream=True, timeout=30):
+        calls.append(url)
+        return DummyDownloadResponse(size=4)
+
+    monkeypatch.setattr(utils_mod.requests, "get", fake_get)
+
+    returned = download_file(
+        "https://primary.example.com/tokenizer-base.json",
+        out_dir=tmp_path,
+    )
+
+    assert returned == existing
+    assert existing.read_bytes() == b"1234"
+    assert calls == ["https://primary.example.com/tokenizer-base.json"]
 
 
 @pytest.mark.parametrize("ModelClass", [Qwen3Model])
@@ -248,7 +393,7 @@ def test_qwen3_base_equivalence_with_transformers():
 
     from transformers.models.qwen3 import Qwen3Config, Qwen3ForCausalLM
 
-    # Tiny config so the test is fast
+    # 使用微型配置以加快测试
     cfg = {
         "vocab_size": 257,
         "context_length": 8,

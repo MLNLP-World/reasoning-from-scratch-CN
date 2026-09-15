@@ -29,7 +29,7 @@
 - 详见[主笔记本](../01_main-chapter-code/chF_main.ipynb)
 
 ```bash
-鉃? 03_leaderboards git:(main) 鉁?uv run 1_elo_leaderboard.py --path votes.json
+➜  03_leaderboards git:(main) ✗ uv run 1_elo_leaderboard.py --path votes.json
 
 Leaderboard (Elo) 
 -----------------------
@@ -42,12 +42,12 @@ Leaderboard (Elo)
 &nbsp;
 ## 方法 2：Bradley-Terry 模型
 
-- 实现了一个 [Bradley-Terry 模型](https://en.wikipedia.org/wiki/Bradley%E2%80%93Terry_model)，与官方论文（[Chatbot Arena: An Open Platform for Evaluating LLMs by Human Preference](https://arxiv.org/abs/2403.04132)）描述的新 LM Arena 排行榜类似
+- 实现了一个 [Bradley-Terry 模型](https://en.wikipedia.org/wiki/Bradley–Terry_model)，与官方论文（[Chatbot Arena: An Open Platform for Evaluating LLMs by Human Preference](https://arxiv.org/abs/2403.04132)）描述的新 LM Arena 排行榜类似
 - 与 LM Arena 排行榜一样，得分会重新缩放，使其接近原始 Elo 分数
 - 此处示例使用 PyTorch 的 Adam 优化器来拟合模型（便于熟悉 PyTorch 代码并保持良好可读性）
 
 ```bash
-鉃? 03_leaderboards git:(main) 鉁?uv run 2_bradley_terry_leaderboard.py --path votes.json 
+➜  03_leaderboards git:(main) ✗ uv run 2_bradley_terry_leaderboard.py --path votes.json
 
 Leaderboard (Bradley-Terry)
 -----------------------------

@@ -1,6 +1,6 @@
 # Copyright (c) Sebastian Raschka under Apache License 2.0
-# Source for "Build a Reasoning Model (From Scratch)": https://mng.bz/lZ5B
-# Code repository: https://github.com/rasbt/reasoning-from-scratch
+# 《从零构建推理模型》来源：https://mng.bz/lZ5B
+# 代码仓库：https://github.com/rasbt/reasoning-from-scratch
 
 import argparse
 import json
@@ -10,8 +10,7 @@ import psutil
 import requests
 
 import torch
-from reasoning_from_scratch.ch02 import get_device
-from reasoning_from_scratch.ch02_ex import generate_text_basic_stream_cache
+from reasoning_from_scratch.ch02 import get_device, generate_text_basic_stream_cache
 from reasoning_from_scratch.ch03 import load_model_and_tokenizer
 
 
@@ -24,7 +23,7 @@ def check_if_running(process_name):
     return running
 
 
-# Same as chapter 3
+# 与第 3 章相同
 def get_data():
     local_path = Path("math500_test.json")
     url = (
@@ -82,7 +81,7 @@ def query_model(
         }
     }
 
-    # Send the POST request
+    # 发送 POST 请求
     with requests.post(url, json=data, stream=True, timeout=30) as r:
         r.raise_for_status()
         response_data = ""
@@ -132,43 +131,43 @@ def parse_score(judge_text, default=3):
 
 
 def parse_args():
-    parser = argparse.ArgumentParser()
+    parser = argparse.ArgumentParser(formatter_class=argparse.ArgumentDefaultsHelpFormatter)
     parser.add_argument(
         "--device",
         type=str,
         default="auto",
-        help="Device e.g., 'cpu', 'cuda', 'cuda:0', 'mps'.",
+        help="设备，例如 'cpu'、'cuda'、'cuda:0'、'mps'。",
     )
     parser.add_argument(
         "--which_model",
         type=str,
         default="base",
         choices=["base", "reasoning"],
-        help="Candidate variant to use. Defaults to 'base'.",
+        help="要使用的候选模型变体",
     )
     parser.add_argument(
         "--dataset_size",
         type=int,
         default=10,
-        help="Number of MATH-500 examples to evaluate. Default: 10",
+        help="要评估的 MATH-500 样本数",
     )
     parser.add_argument(
         "--max_new_tokens",
         type=int,
         default=2048,
-        help="Max new tokens for candidate generation. Default: 2048",
+        help="候选答案生成的最大新词元数",
     )
     parser.add_argument(
         "--url",
         type=str,
         default="http://localhost:11434/api/chat",
-        help="Ollama chat endpoint for the judge. Default: 'http://localhost:11434/api/chat'"
+        help="评判模型使用的 Ollama 聊天端点"
     )
     parser.add_argument(
         "--judge_model",
         type=str,
         default="gpt-oss:20b",
-        help="Judge model name (Ollama). Used only for scoring. Default: 'gpt-oss:20b'",
+        help="评判模型名称（Ollama），仅用于评分",
     )
     return parser.parse_args()
 
@@ -189,7 +188,7 @@ def generate_with_qwen3(model, tokenizer, prompt, device, max_new_tokens):
         ):
             new_token_ids.append(int(tok.squeeze(0)))
 
-    # Decode only the generated continuation (not the prompt)
+    # 只解码生成的续写（不包含提示词）
     return tokenizer.decode(new_token_ids)
 
 
@@ -209,11 +208,11 @@ if __name__ == "__main__":
     print("Device:", device)
     dev_name = str(device).replace(":", "-")
 
-    # Data and local Qwen3 model
+    # 数据和本地 Qwen3 模型
     math_data = get_data()
     pairs = prepare_math500_pairs(math_data)
     if not pairs:
-        raise SystemExit("No usable (instruction, reference_answer) pairs found.")
+        raise SystemExit("未找到可用的（instruction, reference_answer）数据对。")
     pairs = pairs[:dataset_size]
     total = len(pairs)
 
@@ -221,7 +220,7 @@ if __name__ == "__main__":
     candidate_model.eval()
     torch.set_float32_matmul_precision("high")
 
-    # Evaluation loop
+    # 评估循环
     results = []
     score_counts = {i: 0 for i in range(1, 6)}
 
@@ -229,21 +228,21 @@ if __name__ == "__main__":
 
     if not ollama_running:
         raise RuntimeError(
-            "Ollama not running. "
-            "Launch ollama before proceeding."
+            "Ollama 未运行。"
+            "请先启动 Ollama。"
         )
-    print("Ollama running:", check_if_running("ollama"))
+    print("Ollama 运行状态：", check_if_running("ollama"))
 
     for idx, ex in enumerate(pairs, start=1):
         instruction = ex["instruction"]
         reference = ex["reference_answer"]
 
-        # 1) Candidate answer from local Qwen3 (base or reasoning)
+        # 1）来自本地 Qwen3（基础或推理模型）的候选答案
         answer = generate_with_qwen3(
             candidate_model, tokenizer, instruction, device, max_new_tokens
         ).strip()
 
-        # 2) Judge with rubric using gpt-oss:20b (or --judge_model) via Ollama
+        # 2）通过 Ollama 使用 gpt-oss:20b（或 --judge_model）按评分标准评判
         judge_in = rubric_prompt(instruction, reference, answer)
         judge_out = query_model(
             judge_in,
@@ -268,11 +267,11 @@ if __name__ == "__main__":
         )
         print(f"[{idx}/{total}] score={score}", flush=True)
 
-    # Summary
+    # 汇总
     total_scored = sum(score_counts.values())
     avg = (sum(k * v for k, v in score_counts.items()) / total_scored) if total_scored else 0.0
 
     print("\nSummary")
     print("-------")
-    print(f"Average score: {avg:.3f} over {total_scored} example(s)")
+    print(f"平均分数： {avg:.3f} over {total_scored} example(s)")
     print("Counts:", " ".join(f"{k}:{v}" for k, v in score_counts.items()))

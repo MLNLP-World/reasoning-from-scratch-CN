@@ -1,12 +1,12 @@
-# 第3章：评估推理模型
-
-
-&nbsp;
-## 本章主要代码
-
-- [01_main-chapter-code](01_main-chapter-code)：本章主代码与练习解答
+# 第 3 章：评估推理模型
 
 &nbsp;
-## 更多资料
+## 主要章节代码
 
-- [02_math500-verifier-scripts](02_math500-verifier-scripts)：可选的 Python 脚本，可在命令行运行 MATH-500 评测，包含吞吐量更高的批处理版本
+- [01_main-chapter-code](01_main-chapter-code)：主要章节代码和练习解答
+
+&nbsp;
+## 附加材料
+
+- [02_math500-verifier-scripts](02_math500-verifier-scripts)：用于从命令行运行 MATH-500 评估的可选 Python 脚本，包括吞吐量更高的批处理版本
+- [03_advanced-parser](03_advanced-parser)：更完善的混合 LaTeX 解析器，以及一个在选定样本上将其与当前解析器比较的 notebook

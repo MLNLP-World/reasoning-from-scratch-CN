@@ -1,9 +1,9 @@
 # Copyright (c) Sebastian Raschka under Apache License 2.0 (see LICENSE.txt)
-# Source for "Build a Reasoning Model (From Scratch)": https://mng.bz/lZ5B
-# Code repository: https://github.com/rasbt/reasoning-from-scratch
+# 《从零构建推理模型》来源：https://mng.bz/lZ5B
+# 代码仓库：https://github.com/rasbt/reasoning-from-scratch
 
-# Runs the model similar to chapter 2 and 3 in streaming mode with the least
-# amount of bells and whistles. Uses KV caching by default.
+# 以类似第 2、3 章的方式，用最精简的流式模式运行模型
+# 默认使用 KV 缓存，不加入额外复杂功能。
 
 import argparse
 from pathlib import Path
@@ -14,7 +14,7 @@ from reasoning_from_scratch.ch02 import (
     get_device,
     generate_stats
 )
-from reasoning_from_scratch.ch02_ex import (
+from reasoning_from_scratch.ch02 import (
     generate_text_basic_stream_cache
 )
 from reasoning_from_scratch.qwen3 import (
@@ -24,37 +24,37 @@ from reasoning_from_scratch.qwen3 import (
     QWEN_CONFIG_06_B
 )
 
-parser = argparse.ArgumentParser(description="Run Qwen3 text generation")
+parser = argparse.ArgumentParser(formatter_class=argparse.ArgumentDefaultsHelpFormatter, description="运行 Qwen3 文本生成")
 parser.add_argument(
     "--device",
     type=str,
     default=None,
-    help="Device to run on (e.g. 'cpu', 'cuda', 'mps'). "
-         "If not provided, will auto-detect with get_device()."
+    help="运行设备（例如 'cpu'、'cuda'、'mps'）。"
+         "未提供时使用 get_device() 自动检测。"
 )
 parser.add_argument(
     "--max_new_tokens",
     type=int,
     default=2048,
-    help="Maximum number of new tokens to generate (default: 2048)."
+    help="要生成的最大新词元数。"
 )
 parser.add_argument(
     "--compile",
     action="store_true",
-    help="Compile PyTorch model (default: False)."
+    help="编译 PyTorch 模型。"
 )
 parser.add_argument(
     "--reasoning",
     action="store_true",
-    help="Use reasoning model variant (default: False)."
+    help="使用推理模型变体。"
 )
 parser.add_argument(
     "--prompt",
     type=str,
     default=None,
-    help=("Use a custom prompt. If not explicitly provided, uses the following defaults: "
-          "'Explain large language models in a single sentence.' for the base model, and "
-          "'Find all c in Z_3 such that Z_3[x]/(x^2 + c) is a field.' for the reasoning model.")
+    help=("使用自定义提示词。未明确提供时，使用以下默认值："
+          "'Explain large language models in a single sentence.'（基础模型），以及 "
+          "'Find all c in Z_3 such that Z_3[x]/(x^2 + c) is a field.'（推理模型）。")
 )
 
 args = parser.parse_args()
@@ -128,4 +128,4 @@ for token in generate_text_basic_stream_cache(
 end_time = time.time()
 
 print("\n")
-generate_stats(torch.tensor(all_token_ids), tokenizer, start_time, end_time, print_tokens=False)
+generate_stats(torch.tensor(all_token_ids), tokenizer, start_time, end_time)

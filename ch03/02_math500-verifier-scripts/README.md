@@ -6,6 +6,7 @@
 
 - [evaluate_math500.py](evaluate_math500.py)：命令行独立脚本，可在 MATH-500 数据集上评估模型
 - [evaluate_math500_batched.py](evaluate_math500_batched.py)：与上类似，但会在生成阶段并行处理多条样本以提高吞吐
+- [evaluate_json.py](evaluate_json.py)：评估已保存的 JSON/JSONL 记录文件并报告准确率
 
 两个脚本都会复用 [`reasoning_from_scratch`](../../reasoning_from_scratch) 包中的功能以避免重复代码。（安装方式见[第2章环境说明](../../ch02/02_setup-tips/python-instructions.md)。）
 
@@ -89,7 +90,7 @@ PYTORCH_ENABLE_MPS_FALLBACK=1 uv run evaluate_math500_batched.py
 
 - `evaluate_math500.py --dataset_size 500`
 
-| Device / Dataset size                              | Base model | Reasoning model |
+| 设备 / 数据集大小                                  | 基础模型 | 推理模型 |
 | -------------------------------------------------- | ---------- | --------------- |
 | **Mac Mini M4 CPU**（500 条，顺序）                 | 43.6 min   | 未运行（发热严重） |
 | **Mac Mini M4 GPU**（500 条，顺序）                 | 37.5 min   | 未运行（发热严重） |
@@ -100,7 +101,7 @@ PYTORCH_ENABLE_MPS_FALLBACK=1 uv run evaluate_math500_batched.py
 
 - `evaluate_math500_batched.py --dataset_size 500 --batch_size 128`
 
-| Device / Dataset size                                        | Base model | Reasoning model |
+| 设备 / 数据集大小                                              | 基础模型 | 推理模型 |
 | ------------------------------------------------------------ | ---------- | --------------- |
 | **Mac Mini M4 CPU**（500 条，批处理，`--batch_size 128`）       | 167.2 min  | 未运行（发热严重） |
 | **Mac Mini M4 GPU**（500 条，批处理，`--batch_size 128`）       | Error*     | Error           |
@@ -108,3 +109,23 @@ PYTORCH_ENABLE_MPS_FALLBACK=1 uv run evaluate_math500_batched.py
 | **H100 GPU**（500 条，批处理，`--batch_size 128`）             | 3.3 min    | 14.6 min        |
 
 - 基础模型准确率 15.6%（78/500）；推理模型准确率 50.8%（254/500）。
+
+
+&nbsp;
+## `evaluate_json.py` 用法
+
+如果已有保存的记录，只想重新计算准确率，请使用此脚本：
+
+```bash
+uv run evaluate_json.py --json_path math500_base-mps-evaluate-script.jsonl
+# Accuracy 15.6% (78/500)
+```
+
+可选键名：
+
+```bash
+uv run evaluate_json.py \
+  --json_path my_records.json \
+  --gtruth_answer "gtruth_answer" \
+  --generated_text "generated_text"
+```

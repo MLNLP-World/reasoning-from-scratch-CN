@@ -1,6 +1,6 @@
 # Copyright (c) Sebastian Raschka under Apache License 2.0 (see LICENSE.txt)
-# Source for "Build a Reasoning Model (From Scratch)": https://mng.bz/lZ5B
-# Code repository: https://github.com/rasbt/reasoning-from-scratch
+# 《从零构建推理模型》来源：https://mng.bz/lZ5B
+# 代码仓库：https://github.com/rasbt/reasoning-from-scratch
 import json
 import argparse
 
@@ -24,13 +24,14 @@ def elo_ratings(vote_pairs, k_factor=32, initial_rating=1000):
 
 def main():
     parser = argparse.ArgumentParser(
-        description="Compute Elo leaderboard."
+        formatter_class=argparse.ArgumentDefaultsHelpFormatter,
+        description="计算 Elo 排行榜。"
     )
-    parser.add_argument("--path", type=str, help="Path to votes JSON")
+    parser.add_argument("--path", type=str, help="投票 JSON 的路径")
     parser.add_argument("--k", type=int, default=32,
-                        help="Elo k-factor")
+                        help="Elo K 因子")
     parser.add_argument("--init", type=int, default=1000,
-                        help="Initial rating")
+                        help="初始评分")
     args = parser.parse_args()
 
     with open(args.path, "r", encoding="utf-8") as f:
@@ -40,7 +41,7 @@ def main():
     leaderboard = sorted(ratings.items(),
                          key=lambda x: -x[1])
 
-    print("\nLeaderboard (Elo) \n-----------------------")
+    print("\n排行榜（Elo）\n-----------------------")
     for i, (model, score) in enumerate(leaderboard, 1):
         print(f"{i:>2}. {model:<10} {score:7.1f}")
     print()
