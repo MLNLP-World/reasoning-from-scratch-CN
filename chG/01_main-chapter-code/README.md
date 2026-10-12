@@ -9,17 +9,31 @@
 &nbsp;
 ## 第 1 步：安装依赖
 
-首先安装 `chainlit` 包及其依赖：
+本附录使用 Python 3.13。Chainlit 目前不支持 Python 3.14；在 Python 3.14 下安装仓库的 `extra` 依赖时，会跳过 Chainlit。
+
+首先从仓库根目录进入此文件夹：
 
 ```bash
-pip install chainlit
+cd chG/01_main-chapter-code
 ```
 
-如果使用 `uv`，则运行：
+如果使用 pip，在此目录创建 Python 3.13 虚拟环境并安装依赖。macOS / Linux：
 
 ```bash
-uv add chainlit
+python3.13 -m venv .venv
+source .venv/bin/activate
+python -m pip install -e "../..[extra]"
 ```
+
+Windows（PowerShell）：
+
+```powershell
+py -3.13 -m venv .venv
+.\.venv\Scripts\Activate.ps1
+python -m pip install -e "../..[extra]"
+```
+
+如果使用 uv，可跳过上述 pip 命令。第 2 步的 uv 命令会创建隔离的 Python 3.13 环境并安装仓库的 `extra` 依赖，主项目环境使用 Python 3.14 时也可采用此方式。
 
 &nbsp;
 
@@ -41,7 +55,7 @@ chainlit run qwen3_chat_interface.py
 如果使用 `uv`，则运行：
 
 ```bash
-uv run chainlit run qwen3_chat_interface.py
+uv run --isolated --python 3.13 --extra extra chainlit run qwen3_chat_interface.py
 ```
 
 执行上述任一命令后，应会打开新的浏览器标签页，以便与模型交互。如果浏览器标签页没有自动打开，请查看终端输出，并将本地地址复制到浏览器地址栏（通常为 `http://localhost:8000`）。
@@ -54,7 +68,7 @@ uv run chainlit run qwen3_chat_interface.py
 
 ```bash
 CHECKPOINT_PATH=/absolute/path/to/qwen3-0.6B-distill-step06682-epoch1.pth \
-uv run chainlit run qwen3_chat_interface.py
+uv run --isolated --python 3.13 --extra extra chainlit run qwen3_chat_interface.py
 ```
 
 说明：

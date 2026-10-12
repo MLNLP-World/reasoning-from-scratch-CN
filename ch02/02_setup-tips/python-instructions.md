@@ -19,6 +19,8 @@
 python --version
 ```
 
+运行[附录 G 聊天界面](../../chG/01_main-chapter-code)时请使用 Python 3.13，因为 Chainlit 目前不支持 Python 3.14。
+
 如果你还在用Python 3.9或更低版本，建议从 [python.org](https://www.python.org/downloads/) 安装最新版，或用 [`pyenv`](https://github.com/pyenv/pyenv) 管理多版本。安装新版本时请确认PyTorch是否支持，可参考 [PyTorch官网](https://pytorch.org/get-started/locally/) 的建议。PyTorch通常会落后Python新版本几个月，因此最新Python版本不一定立即受支持。
 
 需要安装新包（如PyTorch、Jupyter Lab）时：
@@ -88,9 +90,9 @@ git clone https://github.com/rasbt/reasoning-from-scratch.git
 cd reasoning-from-scratch
 ```
 
-由于该文件夹包含 `pyproject.toml` 和 `.python-version` 文件，因此可以直接使用：首次运行脚本或打开 Jupyter Lab 时，`uv` 会自动为 `reasoning-from-scratch` 项目创建一个默认隐藏的虚拟环境文件夹（`.venv`），并在其中安装全部依赖。
+`pyproject.toml` 文件列出了所需软件包。首次运行脚本或打开 Jupyter Lab 时，`uv` 会自动为 `reasoning-from-scratch` 项目创建一个默认隐藏的虚拟环境文件夹（`.venv`），并在其中安装全部依赖。
 
-`.python-version` 文件目前将本地 `uv` 环境固定为 Python 3.13，以避免意外选择比本项目测试过的 PyTorch 版本更新的 Python。如果 `uv` 使用了其他 Python 版本，可以运行以下命令重置本地固定版本：
+仓库未包含 `.python-version` 文件。若要为本地 `uv` 环境指定 Python 3.13，可运行以下命令：
 
 ```bash
 uv python pin 3.13
@@ -120,6 +122,21 @@ uv run jupyter lab
 
 ```bash
 uv run python script.py
+```
+
+仓库随附的 `uv.lock` 使用本书原始代码的 PyTorch 2.10.0。因此，常规 `uv run` 默认采用该锁定版本；`uv` 会为支持的操作系统选择对应的软件包。
+
+`pyproject.toml` 允许的其他 PyTorch 版本可以通过更新本地锁文件使用：
+
+```bash
+uv lock --upgrade-package torch
+```
+
+更新一次后，后续 `uv run` 会使用新的锁定版本。该命令会修改本地 `uv.lock`。若要恢复仓库提交的版本，可运行：
+
+```bash
+git restore uv.lock
+uv sync
 ```
 
 > **进阶用法：** 以上只是给`pip`用户参考的简化流程。若想深入了解如何用`uv`管理虚拟环境，可阅读[这份文档](https://github.com/rasbt/LLMs-from-scratch/tree/main/setup/01_optional-python-setup-preferences)。  
