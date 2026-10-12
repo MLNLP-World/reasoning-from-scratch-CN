@@ -58,7 +58,7 @@ dev = [
 [project.optional-dependencies]
 extra = [
     "datasets>=4.1.1",  # 附录 F：MMLU
-    "chainlit>=2.8.3",  # 附录 G：聊天界面
+    "chainlit>=2.8.3; python_version < '3.14'",  # 附录 G：聊天界面
 ]
 
 [tool.setuptools.packages.find]

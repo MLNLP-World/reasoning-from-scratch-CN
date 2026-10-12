@@ -161,7 +161,7 @@ def generate_text_temp_stream_cache(
 
     # 步骤 3.1：获取 logits
     out = model(token_ids, cache=cache)[:, -1]
-    for _ in range(max_new_tokens):
+    for step in range(max_new_tokens):
 
         ########################################
         # 新增：
@@ -187,7 +187,8 @@ def generate_text_temp_stream_cache(
             break
 
         yield next_token
-        out = model(next_token, cache=cache)[:, -1]
+        if step + 1 < max_new_tokens:
+            out = model(next_token, cache=cache)[:, -1]
 
 
 def top_p_filter(probas, top_p):
@@ -236,7 +237,7 @@ def generate_text_top_p_stream_cache(
 
     # 步骤 3.1：获取 logits
     out = model(token_ids, cache=cache)[:, -1]
-    for _ in range(max_new_tokens):
+    for step in range(max_new_tokens):
 
         orig_device = token_ids.device
 
@@ -262,7 +263,8 @@ def generate_text_top_p_stream_cache(
             break
 
         yield next_token
-        out = model(next_token, cache=cache)[:, -1]
+        if step + 1 < max_new_tokens:
+            out = model(next_token, cache=cache)[:, -1]
 
 
 def self_consistency_vote(

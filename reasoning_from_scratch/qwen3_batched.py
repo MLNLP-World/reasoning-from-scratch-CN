@@ -361,10 +361,20 @@ def generate_text_basic_batched_cache(
     # 解码
     cur_attn = attn_mask
     generated_tokens = []
-    for _ in range(max_new_tokens):
+    for step in range(max_new_tokens):
         # 如果所有序列都已完成，则停止
         if eos_token_id is not None and finished is not None and torch.all(finished):
             break
+
+        if step > 0:
+
+            # 扩展掩码以包含新生成的词元
+            if cur_attn is not None:
+                ones = torch.ones((batch_size, 1), dtype=cur_attn.dtype, device=device)
+                cur_attn = torch.cat([cur_attn, ones], dim=1)
+
+            # 使用 KV 缓存向前生成一个词元
+            out = model(generated_tokens[-1], cache=cache, attn_mask=cur_attn)[:, -1]
 
         next_token = torch.argmax(out, dim=-1, keepdim=True)
 
@@ -372,14 +382,6 @@ def generate_text_basic_batched_cache(
             # 强制已完成的行继续生成 EOS，以维持张量形状
             eos_tok = next_token.new_full((batch_size, 1), eos_token_id)
             next_token = torch.where(finished.view(batch_size, 1), eos_tok, next_token)
-
-        # 扩展掩码以包含新生成的词元
-        if cur_attn is not None:
-            ones = torch.ones((batch_size, 1), dtype=cur_attn.dtype, device=device)
-            cur_attn = torch.cat([cur_attn, ones], dim=1)
-
-        # 使用 KV 缓存向前生成一个词元
-        out = model(next_token, cache=cache, attn_mask=cur_attn)[:, -1]
         generated_tokens.append(next_token)
 
         # 追加本步骤词元后更新完成状态掩码
@@ -418,13 +420,16 @@ def generate_text_basic_batched_stream_cache(
 
     # 解码
     cur_attn = attn_mask
-    for _ in range(max_new_tokens):
+    for step in range(max_new_tokens):
         next_token = torch.argmax(out, dim=-1, keepdim=True)
 
         if eos_token_id is not None and torch.all(next_token.squeeze(-1) == eos_token_id):
             break
 
         yield next_token
+
+        if step + 1 == max_new_tokens:
+            break
 
         # 扩展掩码以包含新生成的词元
         if cur_attn is not None:
@@ -482,7 +487,7 @@ def generate_text_basic_batched_cache_stop(
     cur_attn_active = attn_mask                  # 与活动缓存对应
     generated_full_steps = []                    # 由 (B, 1) 单步张量组成的列表
 
-    for _ in range(max_new_tokens):
+    for step in range(max_new_tokens):
         # 活动子批次的下一个词元
         next_token_active = torch.argmax(out, dim=-1, keepdim=True)  # 形状：(B_active, 1)
 
@@ -492,6 +497,9 @@ def generate_text_basic_batched_cache_stop(
                                dtype=token_ids.dtype, device=device)
         step_full.index_copy_(0, active_idx, next_token_active)
         generated_full_steps.append(step_full)
+
+        if step + 1 == max_new_tokens:
+            break
 
         # 在完整批次坐标中更新完成状态记录
         if eos_token_id is not None:
@@ -568,7 +576,7 @@ def generate_text_basic_batched_stream_cache_stop(
     active_idx = torch.arange(B, device=device)
     cur_attn_active = attn_mask
 
-    for _ in range(max_new_tokens):
+    for step in range(max_new_tokens):
         next_token_active = torch.argmax(out, dim=-1, keepdim=True)  # 形状：(B_active, 1)
 
         # 构建完整大小的单步张量并产出
@@ -590,6 +598,9 @@ def generate_text_basic_batched_stream_cache_stop(
 
         # 在缩减前产出，使调用方每一步仍恰好看到一个 (B, 1) 张量
         yield step_full
+
+        if step + 1 == max_new_tokens:
+            break
 
         if eos_token_id is not None and torch.all(finished_full):
             break
