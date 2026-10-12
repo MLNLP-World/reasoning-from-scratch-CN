@@ -35,8 +35,10 @@ COMPILE = False
 
 
 def trim_input_tensor(input_ids_tensor, context_len, max_new_tokens):
-    assert max_new_tokens < context_len
-    keep_len = max(1, context_len - max_new_tokens)
+    if max_new_tokens > context_len:
+        raise ValueError("max_new_tokens must not exceed context_len.")
+    # 最后一个生成词元无需再次前向计算。
+    keep_len = max(1, context_len - max(0, max_new_tokens - 1))
 
     # 如果提示词过长，则从左侧截断到 keep_len
     if input_ids_tensor.shape[1] > keep_len:
