@@ -108,7 +108,7 @@ PYTORCH_ENABLE_MPS_FALLBACK=1 uv run evaluate_math500_batched.py
 | **DGX Spark**（500 条，批处理，`--batch_size 128`）            | 16.3 min   | 119.3 min       |
 | **H100 GPU**（500 条，批处理，`--batch_size 128`）             | 3.3 min    | 14.6 min        |
 
-- 基础模型准确率 15.6%（78/500）；推理模型准确率 50.8%（254/500）。
+- 基础模型准确率 15.6%（78/500）；推理模型准确率 48.2%（241/500）。
 
 
 &nbsp;
